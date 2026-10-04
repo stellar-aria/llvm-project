@@ -2435,7 +2435,7 @@ def C_MUL64_00110011 : SHARCCompute23<(ins DBL_op:$rn, FREG_op:$rx, FREG_op:$ry)
   let Inst{3-0} = ry;
 }
 
-def SI_000000 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = LSHIFT $rx BY $data:s"> {
+def SI_000000 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = LSHIFT $rx BY $cat(^dataex,data):s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;
@@ -2457,7 +2457,7 @@ def C_SHIFT_00000000 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
   let Inst{3-0} = ry;
 }
 
-def SI_000001 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = ASHIFT $rx BY $data:s"> {
+def SI_000001 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = ASHIFT $rx BY $cat(^dataex,data):s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;
@@ -2479,7 +2479,7 @@ def C_SHIFT_00000100 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
   let Inst{3-0} = ry;
 }
 
-def SI_000010 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = ROT $rx BY $data:s"> {
+def SI_000010 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = ROT $rx BY $cat(^dataex,data):s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;
@@ -2501,7 +2501,7 @@ def C_SHIFT_00001000 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
   let Inst{3-0} = ry;
 }
 
-def SI_001000 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR LSHIFT $rx BY $data:s"> {
+def SI_001000 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR LSHIFT $rx BY $cat(^dataex,data):s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;
@@ -2523,7 +2523,7 @@ def C_SHIFT_00100000 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
   let Inst{3-0} = ry;
 }
 
-def SI_001001 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR ASHIFT $rx BY $data:s"> {
+def SI_001001 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR ASHIFT $rx BY $cat(^dataex,data):s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;

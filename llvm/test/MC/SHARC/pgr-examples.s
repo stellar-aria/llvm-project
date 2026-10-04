@@ -68,6 +68,7 @@ R0<->S0;
 R1=LSHIFT R2 BY 4;
 # CHECK: encoding: [0x3e,0x80,0x00,0x00,0x12,0x04]
 
-# Type 6 shift immediate with a memory move
+# Type 6 shift immediate with a memory move; the count is DATAEX:DATA, so a
+# negative count sets DATAEX to all ones, as SHARC+ code does
 R1=ASHIFT R2 BY -3, R5=DM(I1,M2);
-# CHECK: encoding: [0xbe,0x82,0x81,0x02,0x12,0xfd]
+# CHECK: encoding: [0xbe,0x82,0x81,0x7a,0x12,0xfd]

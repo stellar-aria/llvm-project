@@ -255,6 +255,26 @@ Manual errata
      - The PGR's Type 3b syntax (9-12) lists (LW); l/x/w = 0/1/1 is the plain
        access in the same table.
    * - PRM
+     - 14-16 (Type 3b BHSE table)
+     - No (SWSE) row
+     - l/x/w = 1/1/0 is (SWSE), as in Type 4b
+     - SHARC+ code uses it.
+   * - PRM
+     - 14-22 (Type 3d tables)
+     - Only rows with EX
+     - ex = 0 gives (BW), (SW), (BWSE), (SWSE) without EX
+     - SHARC+ code uses Type 3d without EX where a 48-bit form is required.
+   * - PRM, PGR
+     - Table 12-11, Type 6a
+     - The LSHIFT/ASHIFT/ROT immediate is <data8>
+     - The count is DATAEX:DATA, 12-bit two's complement
+     - SHARC+ code sets DATAEX to all ones for negative counts.
+   * - PRM
+     - 17-3 (Type 18a figure)
+     - Bit 36 is neither fixed nor a field
+     - Undefined; decoded with a warning
+     - SHARC+ code sets it in one place; its meaning is open.
+   * - PRM
      - 14-46 (Type 7a figure)
      - No M register field
      - m at bits 29-27

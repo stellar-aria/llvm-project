@@ -46,11 +46,13 @@ SHARC_COMMON_PART(MEMPOST, "g=0", "DM($I(g,i), $M(g,m))")
 SHARC_COMMON_PART(MEMPOST, "g=1", "PM($I(g,i), $M(g,m))")
 SHARC_COMMON_PART(MEMPRE, "g=0", "DM($M(g,m), $I(g,i))")
 SHARC_COMMON_PART(MEMPRE, "g=1", "PM($M(g,m), $I(g,i))")
-// 6-bit immediate modifier (PRM 14-26 ACCESS table).
-SHARC_COMMON_PART(IMMPOST, "g=0", "DM($I(g,i), $data:s)")
-SHARC_COMMON_PART(IMMPOST, "g=1", "PM($I(g,i), $data:s)")
-SHARC_COMMON_PART(IMMPRE, "g=0", "DM($data:s, $I(g,i))")
-SHARC_COMMON_PART(IMMPRE, "g=1", "PM($data:s, $I(g,i))")
+// 6-bit immediate modifier (PRM 14-26 ACCESS table). Memory offsets and
+// modifiers all print as signed hex, so equivalent encodings of one access
+// (Types 4, 15a and 15b) print the same.
+SHARC_COMMON_PART(IMMPOST, "g=0", "DM($I(g,i), $data:h)")
+SHARC_COMMON_PART(IMMPOST, "g=1", "PM($I(g,i), $data:h)")
+SHARC_COMMON_PART(IMMPRE, "g=0", "DM($data:h, $I(g,i))")
+SHARC_COMMON_PART(IMMPRE, "g=1", "PM($data:h, $I(g,i))")
 SHARC_COMMON_PART(LW, "l=0", "")
 SHARC_COMMON_PART(LW, "l=1", " (LW)")
 
@@ -121,6 +123,9 @@ SHARC_PART(T3b, BHSE, "l=1,x=1,w=1", " (LW)")
 SHARC_PART(T3b, BHSE, "+byte-addr,l=0,x=0,w=0", " (BW)")
 SHARC_PART(T3b, BHSE, "+byte-addr,l=0,x=1,w=0", " (BWSE)")
 SHARC_PART(T3b, BHSE, "+byte-addr,l=1,x=0,w=0", " (SW)")
+// (SWSE) as in Type 4b: the PRM's Type 3b table omits it, but SHARC+ code
+// uses it.
+SHARC_PART(T3b, BHSE, "+byte-addr,l=1,x=1,w=0", " (SWSE)")
 SHARC_SYNTAX(T3b, "", "[IF $cond ]%ACC")
 
 // Type 3c: Dreg <-> DM, 16-bit (PRM 14-20).
@@ -137,12 +142,21 @@ SHARC_PART(T3d, ST, "w=0,l=0,ex=1", " (BW, EX)")
 SHARC_PART(T3d, ST, "w=0,l=1,ex=1", " (SW, EX)")
 SHARC_PART(T3d, ST, "w=1,l=0,ex=1", " (EX)")
 SHARC_PART(T3d, ST, "w=1,l=1,ex=1", " (LW, EX)")
+// Without EX: a plain byte or short-word access in a 48-bit form, which
+// SHARC+ code uses where a 48-bit encoding is required (the end of a VISA
+// hardware loop). The PRM's Type 3d tables list only the EX rows.
+SHARC_PART(T3d, ST, "w=0,l=0,ex=0", " (BW)")
+SHARC_PART(T3d, ST, "w=0,l=1,ex=0", " (SW)")
 SHARC_PART(T3d, LD, "w=0,l=0,x=0,ex=1", " (BW, EX)")
 SHARC_PART(T3d, LD, "w=0,l=1,x=0,ex=1", " (SW, EX)")
 SHARC_PART(T3d, LD, "w=0,l=0,x=1,ex=1", " (BWSE, EX)")
 SHARC_PART(T3d, LD, "w=0,l=1,x=1,ex=1", " (SWSE, EX)")
 SHARC_PART(T3d, LD, "w=1,l=0,ex=1", " (EX)")
 SHARC_PART(T3d, LD, "w=1,l=1,ex=1", " (LW, EX)")
+SHARC_PART(T3d, LD, "w=0,l=0,x=0,ex=0", " (BW)")
+SHARC_PART(T3d, LD, "w=0,l=1,x=0,ex=0", " (SW)")
+SHARC_PART(T3d, LD, "w=0,l=0,x=1,ex=0", " (BWSE)")
+SHARC_PART(T3d, LD, "w=0,l=1,x=1,ex=0", " (SWSE)")
 SHARC_SYNTAX(T3d, "", "[IF $cond ]%ACC")
 
 // Type 4a: Dreg <-> memory with 6-bit immediate modifier (PRM 14-26).
@@ -294,12 +308,14 @@ SHARC_PART(T14d, LD, "w=0,ex=0,l=0,x=1", " (BWSE)")
 SHARC_PART(T14d, LD, "w=0,ex=0,l=1,x=1", " (SWSE)")
 
 // Type 15a/15b: Ureg <-> memory at I + immediate offset (PRM 16-7, 16-10).
-SHARC_PART(T15a, OFF, "g=0", "DM($addr, $I(g,i))")
-SHARC_PART(T15a, OFF, "g=1", "PM($addr, $I(g,i))")
+// The offset prints signed, as in Type 15b, so both forms of one access read
+// the same.
+SHARC_PART(T15a, OFF, "g=0", "DM($addr:h, $I(g,i))")
+SHARC_PART(T15a, OFF, "g=1", "PM($addr:h, $I(g,i))")
 SHARC_SYNTAX(T15a, "d=0", "$ureg = %OFF%LW")
 SHARC_SYNTAX(T15a, "d=1", "%OFF = $ureg%LW")
-SHARC_PART(T15b, OFF, "g=0", "DM($data:s, $I(g,i))")
-SHARC_PART(T15b, OFF, "g=1", "PM($data:s, $I(g,i))")
+SHARC_PART(T15b, OFF, "g=0", "DM($data:h, $I(g,i))")
+SHARC_PART(T15b, OFF, "g=1", "PM($data:h, $I(g,i))")
 SHARC_SYNTAX(T15b, "d=0", "$ureg = %OFF%LW")
 SHARC_SYNTAX(T15b, "d=1", "%OFF = $ureg%LW")
 

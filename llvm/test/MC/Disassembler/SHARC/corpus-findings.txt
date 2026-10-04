@@ -1,0 +1,35 @@
+## Encodings that SHARC+ firmware uses but the manuals' syntax tables
+## miss or misstate, found by the M1 corpus check (synthetic words here).
+# RUN: split-file %s %t
+# RUN: llvm-mc --disassemble -triple=sharc -mcpu=adsp-2156x %t/isa.txt | FileCheck %t/isa.txt
+# RUN: llvm-mc --disassemble -triple=sharc -mcpu=adsp-2156x -mattr=+visa-section %t/visa.txt | FileCheck %t/visa.txt
+# RUN: %python %S/../../SHARC/Inputs/roundtrip.py llvm-mc %t/isa.txt -mcpu=adsp-2156x | FileCheck %s --check-prefix=RT
+# RUN: %python %S/../../SHARC/Inputs/roundtrip.py llvm-mc %t/visa.txt -mcpu=adsp-2156x -mattr=+visa-section | FileCheck %s --check-prefix=RT
+# RT-NOT: FAIL
+# RT: roundtrip:
+
+#--- isa.txt
+# Type 3d without EX, load (BW)
+# CHECK: R0 = DM(M2, I1) (BW);
+0xbe 0x42 0x30 0x00 0x00 0x00
+
+# Type 3d without EX, load (SWSE)
+# CHECK: R0 = DM(I1, M2) (SWSE);
+0xbe 0x52 0x31 0x40 0x00 0x00
+
+# Type 3d without EX, store (SW)
+# CHECK: DM(I1, M2) = R5 (SW);
+0xbe 0x52 0xb0 0xc2 0x00 0x00
+
+# Type 6a, negative shift count: DATAEX:DATA = 0xffd
+# CHECK: R1 = ASHIFT R2 BY -3, R5 = DM(I1, M2);
+0xbe 0x82 0x81 0x7a 0x12 0xfd
+
+# Type 15a, negative 32-bit offset prints signed
+# CHECK: R15 = DM(-0x4, I6);
+0x0f 0xac 0xff 0xff 0xfc 0xff
+
+#--- visa.txt
+# Type 3b (SWSE), l/x/w = 1/1/0: missing from the PRM's 3b table
+# CHECK: R4 = DM(M2, I1) (SWSE);
+0xbe 0x42 0x3d 0x42

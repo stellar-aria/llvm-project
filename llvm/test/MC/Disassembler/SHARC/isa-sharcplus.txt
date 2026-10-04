@@ -22,11 +22,11 @@
 0xbe 0x52 0xb6 0xc1 0x00 0x00
 
 # Type 4d, PRM 14-32 BHSE table l=1,x=1
-# CHECK-NEXT: R5 = DM(I2, 4) (SWSE);
+# CHECK-NEXT: R5 = DM(I2, 0x4) (SWSE);
 0x7e 0x64 0xb5 0x22 0x00 0x00
 
 # Type 4d BH table l=0, pre-modify, store
-# CHECK-NEXT: PM(-1, I11) = R5 (BW);
+# CHECK-NEXT: PM(-0x1, I11) = R5 (BW);
 0xbf 0x67 0xb0 0xfa 0x00 0x00
 
 # Type 7d, PRM 14-50 ACONV breg=0,toby=1

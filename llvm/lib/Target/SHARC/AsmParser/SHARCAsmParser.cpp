@@ -805,10 +805,12 @@ void SHARCAsmParser::matchPlaceholder(unsigned Opc, const Node &N, size_t Pos,
       unsigned W = O->Width;
       // Short data fields are sign-extended (SHARCUsage.rst, "Immediate
       // data"); only 32-bit data may be written either signed or unsigned.
+      // A 32-bit field wraps, so it may be written signed or unsigned (a
+      // Type 15a offset prints as -0x4).
       bool Fits = O->Kind == OpKind::PCRel ? isIntN(W, X)
-                  : O->Kind == OpKind::Imm
-                      ? (W < 32 ? isIntN(W, X) : isIntN(W, X) || isUIntN(W, X))
-                      : isUIntN(W, X);
+                  : W == 32                ? isIntN(W, X) || isUIntN(W, X)
+                  : O->Kind == OpKind::Imm ? isIntN(W, X)
+                                           : isUIntN(W, X);
       if (!Fits)
         return;
       if (O->Kind != OpKind::PCRel)

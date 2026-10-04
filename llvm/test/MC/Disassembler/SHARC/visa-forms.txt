@@ -40,7 +40,7 @@
 0xfb 0x97
 
 # Type 4b plain (l/x/w = 1/1/1), PRM 14-29
-# CHECK-NEXT: R2 = DM(-5, I6);
+# CHECK-NEXT: R2 = DM(-0x5, I6);
 0x3f 0x6c 0x3f 0xd9
 
 # Type 5b move, PRM 14-39
@@ -68,7 +68,7 @@
 0xc0 0x0a
 
 # Type 15b, PRM 16-10
-# CHECK-NEXT: R7 = DM(-2, I3);
+# CHECK-NEXT: R7 = DM(-0x2, I3);
 0x08 0x96 0xfe 0x03
 
 # Type 16b, PRM 16-14
