@@ -93,6 +93,18 @@ void SHARCMCCodeEmitter::encodeInstruction(const MCInst &MI,
   unsigned Width = MCII.get(MI.getOpcode()).getSize() * 8;
   uint64_t Bits = getBinaryCodeForInstr(MI, Fixups, STI);
   SHARC::writeParcels(Bits << (48 - Width), Width, CB);
+
+  // Operands past the instruction's own come from the parser: hardware loop
+  // positions (expressions), then optionally the 48-bit alternative.
+  unsigned NumOps = SHARC::getOperandInfo(MI.getOpcode()).size();
+  bool HasWide = MI.getNumOperands() > NumOps &&
+                 MI.getOperand(MI.getNumOperands() - 1).isInst();
+  for (unsigned I = NumOps; I < MI.getNumOperands(); ++I)
+    if (MI.getOperand(I).isExpr())
+      Fixups.push_back(MCFixup::create(
+          0, MI.getOperand(I).getExpr(),
+          HasWide ? SHARC::fixup_sharc_loop_end
+                  : SHARC::fixup_sharc_loop_end_fixed));
 }
 
 uint64_t
@@ -103,7 +115,11 @@ SHARCMCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
     return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
   if (MO.isImm())
     return MO.getImm();
-  llvm_unreachable("unexpected operand kind");
+  // The only symbolic field without its own encoder is the SHARC+ loop mode,
+  // decided when the loop closes.
+  Fixups.push_back(
+      MCFixup::create(0, MO.getExpr(), SHARC::fixup_sharc_loop_mode));
+  return 0;
 }
 
 uint64_t SHARCMCCodeEmitter::getNested(const MCInst &MI, unsigned OpNo,

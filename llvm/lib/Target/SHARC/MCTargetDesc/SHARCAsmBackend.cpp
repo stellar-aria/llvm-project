@@ -9,6 +9,9 @@
 #include "SHARCFixupKinds.h"
 #include "SHARCMCTargetDesc.h"
 #include "SHARCParcels.h"
+#include "SHARCSyntax.h"
+#include "llvm/MC/MCAssembler.h"
+#include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCELFObjectWriter.h"
@@ -34,6 +37,22 @@ public:
                   const MCValue &Target, uint8_t *Data, uint64_t Value,
                   bool IsResolved) override;
 
+  /// The parser gives an instruction a 48-bit alternative as its last,
+  /// extra operand when it may have to grow: near a hardware loop end, or
+  /// when a label may be out of range of a 6-bit offset.
+  bool mayNeedRelaxation(unsigned Opcode, ArrayRef<MCOperand> Operands,
+                         const MCSubtargetInfo &STI) const override {
+    return Operands.size() > SHARC::getOperandInfo(Opcode).size() &&
+           Operands.back().isInst();
+  }
+  bool fixupNeedsRelaxationAdvanced(const MCFragment &F, const MCFixup &Fixup,
+                                    const MCValue &Target, uint64_t Value,
+                                    bool Resolved) const override;
+  void relaxInstruction(MCInst &Inst,
+                        const MCSubtargetInfo &STI) const override {
+    Inst = *Inst.getOperand(Inst.getNumOperands() - 1).getInst();
+  }
+
   /// Padding is whole NOPs: 48-bit Type 21a, or 16-bit Type 21c parcels.
   bool writeNopData(raw_ostream &OS, uint64_t Count,
                     const MCSubtargetInfo *STI) const override;
@@ -58,6 +77,9 @@ MCFixupKindInfo SHARCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
       {"fixup_sharc_addr24_isa", 0, 48, 0},
       {"fixup_sharc_addr24_visa", 0, 48, 0},
       {"fixup_sharc_addr32", 0, 48, 0},
+      {"fixup_sharc_loop_end", 0, 0, 0},
+      {"fixup_sharc_loop_end_fixed", 0, 0, 0},
+      {"fixup_sharc_loop_mode", 0, 48, 0},
   };
   if (Kind < FirstTargetFixupKind)
     return MCAsmBackend::getFixupKindInfo(Kind);
@@ -75,6 +97,25 @@ void SHARCAsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
     for (unsigned I = 0; I < Size; ++I)
       Data[I] |= uint8_t(Value >> (8 * I));
     return;
+  }
+  if (Kind == SHARC::fixup_sharc_loop_end ||
+      Kind == SHARC::fixup_sharc_loop_end_fixed ||
+      Kind == SHARC::fixup_sharc_loop_mode) {
+    if (!IsResolved) {
+      getContext().reportError(Fixup.getLoc(), "hardware loop is not closed");
+      return;
+    }
+    if (Kind == SHARC::fixup_sharc_loop_end_fixed) {
+      bool Plus = F.getSubtargetInfo()->hasFeature(SHARC::FeatureSHARCPlus);
+      if (int64_t(Value) >= 1 &&
+          int64_t(Value) <= SHARC::loopEndInstructions(Plus))
+        getContext().reportError(Fixup.getLoc(),
+                                 "no 48-bit form of this instruction for the "
+                                 "end of a hardware loop");
+      return;
+    }
+    if (Kind == SHARC::fixup_sharc_loop_end)
+      return;
   }
   // With a relocation the field stays zero; the addend carries the offset.
   if (!IsResolved)
@@ -125,6 +166,26 @@ void SHARCAsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
     Data[2 * P] = uint8_t(Parcel);
     Data[2 * P + 1] = uint8_t(Parcel >> 8);
   }
+}
+
+bool SHARCAsmBackend::fixupNeedsRelaxationAdvanced(const MCFragment &F,
+                                                   const MCFixup &Fixup,
+                                                   const MCValue &Target,
+                                                   uint64_t Value,
+                                                   bool Resolved) const {
+  unsigned Kind = Fixup.getKind();
+  if (Kind == SHARC::fixup_sharc_loop_end) {
+    bool Plus = F.getSubtargetInfo()->hasFeature(SHARC::FeatureSHARCPlus);
+    return Resolved && int64_t(Value) >= 1 &&
+           int64_t(Value) <= SHARC::loopEndInstructions(Plus);
+  }
+  if (Kind == SHARC::fixup_sharc_pcrel6_visa ||
+      Kind == SHARC::fixup_sharc_pcrel6_isa) {
+    unsigned Unit = SHARC::pcRelUnit(Kind);
+    int64_t V = int64_t(Value);
+    return !Resolved || V % Unit || !isInt<6>(V / Unit);
+  }
+  return false;
 }
 
 bool SHARCAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,

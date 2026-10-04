@@ -98,6 +98,9 @@ struct State {
   /// Template keywords read as symbols ("MR0F" in "R3 = MR0F"): a parse
   /// that needs fewer wins.
   unsigned KeywordSymbols = 0;
+  /// Symbols in 6-bit PC-relative fields: a parse with fewer wins among
+  /// forms of one size, since a wider form needs no relaxation.
+  unsigned NarrowSymbols = 0;
 
   const Value *get(StringRef N) const {
     for (const auto &F : Fields)
@@ -155,6 +158,21 @@ class SHARCAsmParser : public MCTargetAsmParser {
   DenseMap<std::pair<unsigned, size_t>, SmallVector<Nested, 2>> NestedMemo;
   std::optional<MCInst> Parsed;
 
+  // Hardware loops written with a label ("DO end UNTIL ..."), innermost
+  // last. Each instruction after the DO is numbered; when the loop closes,
+  // Count holds the number of instructions in it, so an instruction's
+  // distance from the end is Count - index (see fixup_sharc_loop_end).
+  struct Loop {
+    MCSymbol *End;
+    MCSymbol *Count;
+    MCSymbol *Mode = nullptr;   // SHARC+ loop mode to infer
+    SMLoc Loc;                  // of the end label in the DO
+    unsigned Size = 0;          // instructions so far
+    bool AtLast = false;        // the end label was just defined
+    SmallVector<bool, 16> Flow; // instruction changes flow or idles
+  };
+  SmallVector<Loop, 2> Loops;
+
   // Section modes. A code section holds VISA code if it has SHF_SHARC_VISA,
   // or if VISA is the default (-mattr=+visa-section) and .isa was not used
   // in it. The visa-section feature tracks the current section's mode.
@@ -211,6 +229,17 @@ public:
   void flushPendingInstructions(MCStreamer &Out) override {
     syncSectionMode();
   }
+  void onLabelParsed(MCSymbol *Symbol) override {
+    for (Loop &L : Loops)
+      if (L.End == Symbol)
+        L.AtLast = true;
+  }
+  void onEndOfFile() override {
+    for (const Loop &L : Loops)
+      Error(L.Loc, "hardware loop end '" + L.End->getName() +
+                       "' is not defined in this section");
+    Loops.clear();
+  }
 
   /// "R0 = R1 + R2;" is an instruction, not a symbol assignment.
   bool equalIsAsmAssignment() override { return false; }
@@ -233,12 +262,14 @@ private:
 
   bool available(unsigned Opc) const;
   MCSectionELF *codeSection();
+  void trackLoops(MCInst &I, bool VISA, SMLoc Loc);
+  MCStreamer &Out() { return getParser().getStreamer(); }
   bool syncSectionMode();
   SHARCTargetStreamer &targetStreamer() {
     return static_cast<SHARCTargetStreamer &>(
         *getParser().getStreamer().getTargetStreamer());
   }
-  MCInst *matchStatement();
+  MCInst *matchStatement(unsigned OnlySize = 0);
   const FeatureBitset &features() const { return getSTI().getFeatureBits(); }
 
   void matchSeq(unsigned Opc, const Seq &S, size_t I, size_t Pos, State St,
@@ -753,13 +784,11 @@ void SHARCAsmParser::matchPlaceholder(unsigned Opc, const Node &N, size_t Pos,
     auto V = immAt(Pos);
     if (!V)
       return;
-    // Symbols only where a fixup can place them (SHARCFixupKinds.h): 24- and
-    // 23-bit PC-relative offsets, 24-bit code addresses and 32-bit fields.
+    // Symbols only where a fixup can place them (SHARCFixupKinds.h):
+    // PC-relative offsets, 24-bit code addresses and 32-bit fields.
     if (V->second.Kind == Value::Expr &&
-        !(O->Kind == OpKind::PCRel ? O->Width >= 23
-                                   : O->Width == 32 ||
-                                         (O->Kind == OpKind::Addr &&
-                                          O->Width == 24)))
+        !(O->Kind == OpKind::PCRel ||
+          O->Width == 32 || (O->Kind == OpKind::Addr && O->Width == 24)))
       return;
     if (N.Fmt == 'L' && V->second.Kind != Value::Expr)
       return;
@@ -781,6 +810,8 @@ void SHARCAsmParser::matchPlaceholder(unsigned Opc, const Node &N, size_t Pos,
     }
     State NS = St;
     NS.KeywordSymbols += Keyword;
+    NS.NarrowSymbols +=
+        V->second.Kind == Value::Expr && O->Kind == OpKind::PCRel && O->Width < 23;
     if (NS.set(N.Name, V->second))
       Out.push_back({V->first, std::move(NS)});
     return;
@@ -972,6 +1003,7 @@ bool SHARCAsmParser::parseInstruction(ParseInstructionInfo &Info,
       Sec->setFlags(Sec->getFlags() | ELF::SHF_SHARC_VISA);
   }
   if (MCInst *I = matchStatement()) {
+    trackLoops(*I, getSTI().hasFeature(SHARC::FeatureVISASection), NameLoc);
     Parsed = *I;
     return false;
   }
@@ -994,13 +1026,97 @@ bool SHARCAsmParser::parseInstruction(ParseInstructionInfo &Info,
   return Error(NameLoc, "invalid SHARC instruction");
 }
 
+static bool changesFlow(StringRef Name) {
+  return Name.starts_with("T8a") || Name.starts_with("T9") ||
+         Name.starts_with("T10a") || Name.starts_with("T11") ||
+         Name == "T25a_direct" || Name == "T25a_pcrel" ||
+         Name.starts_with("T22") || Name.starts_with("T12a") ||
+         Name == "T13a";
+}
+
+/// Hardware loops: number \p I within each open loop, attach its loop
+/// positions and 48-bit alternative, close the loops it ends, and open a
+/// loop if it is a DO with a label.
+void SHARCAsmParser::trackLoops(MCInst &I, bool VISA, SMLoc Loc) {
+  MCContext &Ctx = getContext();
+  StringRef Name = MII.getName(I.getOpcode());
+  bool Narrow = MII.get(I.getOpcode()).getSize() < 6;
+
+  // Positions in the open loops; ISA code is all 48-bit already.
+  SmallVector<const MCExpr *, 2> Positions;
+  for (Loop &L : Loops) {
+    if (VISA && Narrow)
+      Positions.push_back(MCBinaryExpr::create(
+          MCBinaryExpr::Sub, MCSymbolRefExpr::create(L.Count, Ctx),
+          MCConstantExpr::create(L.Size, Ctx), Ctx, Loc));
+    ++L.Size;
+    L.Flow.push_back(changesFlow(Name));
+  }
+
+  // A 48-bit alternative for a narrow instruction that may have to grow:
+  // near a loop end, or with a label in a 6-bit offset.
+  bool NarrowSymbol = false;
+  for (const OperandInfo &O : getOperandInfo(I.getOpcode()))
+    if (O.Kind == OpKind::PCRel && O.Width < 23 &&
+        I.getOperand(O.Index).isExpr())
+      NarrowSymbol = true;
+  MCInst *Wide = nullptr;
+  if (Narrow && (!Positions.empty() || NarrowSymbol)) {
+    NestedMemo.clear();
+    Wide = matchStatement(6);
+  }
+  for (const MCExpr *E : Positions)
+    I.addOperand(MCOperand::createExpr(E));
+  if (Wide)
+    I.addOperand(MCOperand::createInst(Wide));
+
+  // Close the loops this instruction ends, innermost first. An inner loop's
+  // end is a change of flow in the loops around it.
+  while (!Loops.empty() && Loops.back().AtLast) {
+    Loop L = Loops.pop_back_val();
+    Out().emitAssignment(L.Count, MCConstantExpr::create(L.Size, Ctx));
+    if (L.Mode) {
+      // F1-active, (F), is safe without a branch or IDLE in the last eleven
+      // instructions (PRM 4-41 text); E2-active otherwise.
+      bool F = none_of(ArrayRef(L.Flow).take_back(11),
+                       [](bool B) { return B; });
+      Out().emitAssignment(L.Mode, MCConstantExpr::create(F, Ctx));
+    }
+    if (!Loops.empty())
+      Loops.back().Flow.back() = true;
+  }
+
+  // A DO with a label opens a loop.
+  if (!Name.starts_with("T12a") && Name != "T13a")
+    return;
+  const MCOperand &Target =
+      I.getOperand(findOperand(I.getOpcode(), "reladdr")->Index);
+  const auto *Ref =
+      Target.isExpr() ? dyn_cast<MCSymbolRefExpr>(Target.getExpr()) : nullptr;
+  if (!Ref)
+    return;
+  Loop L;
+  L.End = const_cast<MCSymbol *>(&Ref->getSymbol());
+  L.Count = Ctx.createTempSymbol("sharc_loop_size", true);
+  L.Loc = Ref->getLoc();
+  // On SHARC+, infer the mode of a counter loop written without (F).
+  MCOperand &Mode = I.getOperand(findOperand(I.getOpcode(), "mode")->Index);
+  if (Name.starts_with("T12a") && getSTI().hasFeature(SHARC::FeatureSHARCPlus) &&
+      Mode.isImm() && Mode.getImm() == 0) {
+    L.Mode = Ctx.createTempSymbol("sharc_loop_mode", true);
+    Mode = MCOperand::createExpr(MCSymbolRefExpr::create(L.Mode, Ctx));
+  }
+  Loops.push_back(std::move(L));
+}
+
 /// Of the forms that match the whole statement, the one reading the fewest
 /// keywords as symbols, then the smallest.
-MCInst *SHARCAsmParser::matchStatement() {
+MCInst *SHARCAsmParser::matchStatement(unsigned OnlySize) {
   MCInst *Best = nullptr;
-  std::pair<unsigned, unsigned> BestKey(~0u, ~0u);
+  std::tuple<unsigned, unsigned, unsigned> BestKey(~0u, ~0u, ~0u);
   for (unsigned Opc : Forms) {
-    if (!available(Opc))
+    if (!available(Opc) ||
+        (OnlySize && MII.get(Opc).getSize() != OnlySize))
       continue;
     for (const SyntaxRow &R : getSyntaxRows(Opc)) {
       if (*R.Part)
@@ -1013,8 +1129,8 @@ MCInst *SHARCAsmParser::matchStatement() {
       for (auto &[P, S] : M) {
         if (P != Toks.size())
           continue;
-        std::pair<unsigned, unsigned> Key(S.KeywordSymbols,
-                                          MII.get(Opc).getSize());
+        std::tuple<unsigned, unsigned, unsigned> Key(
+            S.KeywordSymbols, MII.get(Opc).getSize(), S.NarrowSymbols);
         if (Key >= BestKey)
           continue;
         if (MCInst *I = build(Opc, S)) {

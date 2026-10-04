@@ -162,6 +162,14 @@ bool SHARC::condsHold(const MCInst &MI, StringRef Conds,
     int64_t V;
     if (Value.getAsInteger(0, V))
       llvm_unreachable("malformed syntax condition");
+    // A field still symbolic (the SHARC+ loop mode before its loop closes)
+    // prints as its default, 0.
+    const OperandInfo *O = findOperand(MI.getOpcode(), Name);
+    if (O && MI.getOperand(O->Index).isExpr()) {
+      if (V != 0)
+        return false;
+      continue;
+    }
     std::optional<int64_t> F = getField(MI, Name);
     assert(findOperand(MI.getOpcode(), Name) &&
            "syntax condition names an unknown field");

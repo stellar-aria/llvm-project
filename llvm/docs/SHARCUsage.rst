@@ -170,6 +170,27 @@ The assembler uses them as follows:
 Symbols are not accepted in 16-, 7- or 6-bit data fields or 6-bit
 PC-relative fields; the assembler uses a wider form instead.
 
+Hardware loops
+==============
+
+For a loop written with a label, ``LCNTR = n, DO end UNTIL LCE;`` with
+``end:`` on the loop's last instruction, the assembler:
+
+* uses 48-bit encodings for the last four instructions of the loop in VISA
+  code (ADSP-214xx, PGR 4-54), or the last eleven (SHARC+, PRM p6619 text),
+  or all of a shorter loop. It is an error if such an instruction has no
+  48-bit form, such as a byte load without ``(EX)``;
+* on SHARC+, writes a counter loop as F1-active, ``(F)``, when its last eleven
+  instructions hold no branch, IDLE, loop start or inner loop end, and as
+  E2-active otherwise (PRM 4-41 text, "Loop Categorization"). A loop
+  written with ``(F)`` keeps it.
+
+A loop written with a numeric offset, ``DO (PC, n)``, is left as written.
+
+A PC-relative jump to a label in VISA code starts as a 32-bit Type 9b with
+a 6-bit offset and becomes the 48-bit Type 8a when the label is out of
+range or in another section.
+
 Manual errata
 =============
 
