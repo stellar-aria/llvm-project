@@ -47,7 +47,7 @@ def cond_op : Operand<i32> {
 }
 
 // Unsigned fields: flag bits and selectors.
-foreach n = [1, 3, 4, 8] in
+foreach n = [1, 3, 4, 8, 16] in
   def uimm#n#_op : Operand<i32> {
     let DecoderMethod = "decodeUImmOperand<"#n#">";
   }

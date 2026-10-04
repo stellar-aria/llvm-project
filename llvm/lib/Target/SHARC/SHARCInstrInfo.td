@@ -703,7 +703,7 @@ def T11c : SHARCInst16<(outs), (ins uimm1_op:$x, uimm1_op:$j, cond_op:$cond, uim
 }
 
 // Type12a_imm (pgr values + prm layout)
-def T12a_imm : SHARCInst48<(outs), (ins imm16_op:$data, uimm1_op:$mode, pcrel23_op:$reladdr), "", []> {
+def T12a_imm : SHARCInst48<(outs), (ins uimm16_op:$data, uimm1_op:$mode, pcrel23_op:$reladdr), "", []> {
   let DecoderNamespace = "Form";
   bits<16> data;
   bits<1> mode;
