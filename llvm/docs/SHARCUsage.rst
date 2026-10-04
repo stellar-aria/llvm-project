@@ -213,6 +213,40 @@ guidance (PRM 4-12): fewer than twelve 48-bit instructions' worth of code
 after a branch in its section, and two branches in one 48-bit window of
 VISA code.
 
+Validation
+==========
+
+The encodings come from the public manuals only, by two independent routes:
+
+* **Generated tables.** The form and computation ``.td`` files were generated
+  once from digiemu's tables (themselves read from the PGR and PRM figures)
+  and are maintained by hand since.
+* **Blind transcription.** A separate pass with only the PGR and PRM produced
+  its own form and computation tables. Every difference from LLVM was
+  settled against the manual figure; the outcome is the errata table below.
+  All 323 computations agree with at least one manual reading. Every form
+  difference is either an erratum in that table or an item it marks open.
+
+Every form and computation has a lit test. Expected encodings come from the
+tables, never from LLVM's output.
+
+Outside the LLVM tree, the following checks were run locally:
+
+* **Encoding sweep.** Each form's small fields are enumerated and its wide
+  fields sampled. ``llvm-mc --disassemble``, digiemu's reference decoder and
+  its SLEIGH language agree on form and length, and LLVM's text reassembles
+  to the same bytes. This was run for adsp-2137x (ISA), adsp-214xx (VISA)
+  and adsp-2156x (ISA and VISA), with no failures. MAME's ADSP-2106x
+  disassembler served as a further opinion for classic ISA words; it
+  disagrees only where the 2106x differs from later cores.
+* **SHARC+ firmware.** In a SHARC+ firmware image (not distributed), 21,494
+  distinct words decode to documented forms. 21,493 of them disassemble and
+  reassemble byte for byte. The remaining one is a Type 18a word with bit 36
+  set, which is decoded with a warning (see below). 953 words in encodings
+  the manuals do not document were left out of the check.
+
+No classic-SHARC image has been checked yet.
+
 Manual errata
 =============
 

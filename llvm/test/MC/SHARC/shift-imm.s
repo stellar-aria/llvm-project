@@ -86,3 +86,23 @@ R0 = FEXT R1 BY 8:16, R5 = DM(I1, M2);
 BITDEP R7 BY R8;
 # CHECK: BITDEP R7 BY R8; // encoding: [0x3e,0x01,0x27,0x00,0x78,0x40]
 # DIS: BITDEP R7 BY R8;
+
+# ROT: shift opcode 0000 1000, so 000010
+R1 = ROT R2 BY 5;
+# CHECK: R1 = ROT R2 BY 5; // encoding: [0x3e,0x80,0x02,0x00,0x12,0x05]
+# DIS: R1 = ROT R2 BY 5;
+
+# A negative count sets DATAEX to all ones.
+R1 = ROT R2 BY -3;
+# CHECK: R1 = ROT R2 BY -3; // encoding: [0x3e,0x80,0x02,0x78,0x12,0xfd]
+# DIS: R1 = ROT R2 BY -3;
+
+# OR LSHIFT: 0010 0000
+R3 = R3 OR LSHIFT R4 BY 7;
+# CHECK: R3 = R3 OR LSHIFT R4 BY 7; // encoding: [0x3e,0x80,0x08,0x00,0x34,0x07]
+# DIS: R3 = R3 OR LSHIFT R4 BY 7;
+
+# OR ASHIFT: 0010 0100
+R5 = R5 OR ASHIFT R6 BY -2;
+# CHECK: R5 = R5 OR ASHIFT R6 BY -2; // encoding: [0x3e,0x80,0x09,0x78,0x56,0xfe]
+# DIS: R5 = R5 OR ASHIFT R6 BY -2;

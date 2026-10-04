@@ -275,6 +275,24 @@ Sources are cited as PGR/PRM page (physical PDF page).
 - The 48-bit code addressing item (4.3) is resolved and documented in
   `SHARCUsage.rst`.
 
+### 6.1 Status (2026-10-04)
+
+M1 is implemented. Against the criteria:
+
+- **Met:** every one of the 378 forms and computations has a lit test.
+- **Met:** the encoding sweep agrees with digiemu's decoder and SLEIGH in all
+  four configurations, with no failures.
+- **Met:** 4.3 is resolved and documented.
+- **Met, with open items:** the A-vs-C errata appendix is written. Two
+  questions remain open: the Type 19a SHARC+ `sc`/`w` fields, which overlap
+  the bitrev encoding and are not supported, and the Type 16a `sl`/`by` bits.
+- **Not fully met:** the SHARC+ firmware corpus round-trips 21,493 of 21,494
+  documented-form words. The remaining one is Type 18a with bit 36 set; it is
+  decoded with a warning because the manuals do not define the bit.
+- **Not met:** the classic-SHARC corpus. The Digitakt mk1 DSP section is not
+  in the SHARC+ boot-stream format, so digiemu's loader needs a 214xx
+  boot-stream parser before this can run.
+
 ## 7. Out of scope for M1
 
 Linking and LLD (M2); DataLayout byte width (M3); CodeGen, calling convention
