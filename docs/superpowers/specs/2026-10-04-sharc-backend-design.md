@@ -119,9 +119,12 @@ Sources are cited as PGR/PRM page (physical PDF page).
 
 - The processor-specific section flag `SHF_SHARC_VISA` (in `SHF_MASKPROC`)
   marks VISA code. It is set by the `v` flag in `.section …,"axv"`, or by the
-  `.visa`/`.isa` directives for the current section. On a `+visa` target,
-  text sections default to VISA. There are no mapping symbols, because
-  placement determines the mode and the two can't mix within one section.
+  `.visa`/`.isa` directives for the current section. Code sections are ISA
+  unless marked; `-mattr=+visa-section` makes VISA the default for unmarked
+  code sections (and marks them). (Changed during M1 Task 12 from "VISA by
+  default on +visa targets", which silently changed the meaning of existing
+  ISA code.) There are no mapping symbols, because placement determines the
+  mode and the two can't mix within one section.
 - The AsmParser selects forms by section mode, and the disassembler reads the
   flag. `llvm-objdump` uses the section flag; raw disassembly uses
   `-mattr=+visa` (or its absence).

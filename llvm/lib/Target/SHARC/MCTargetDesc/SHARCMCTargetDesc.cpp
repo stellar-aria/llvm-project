@@ -9,6 +9,7 @@
 #include "SHARCMCTargetDesc.h"
 #include "SHARCInstPrinter.h"
 #include "SHARCMCAsmInfo.h"
+#include "SHARCTargetStreamer.h"
 #include "TargetInfo/SHARCTargetInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
@@ -61,6 +62,21 @@ static MCInstPrinter *createSHARCMCInstPrinter(const Triple &T,
   return new SHARCInstPrinter(MAI, MII, MRI);
 }
 
+static MCTargetStreamer *
+createSHARCAsmTargetStreamer(MCStreamer &S, formatted_raw_ostream &OS,
+                             MCInstPrinter *InstPrint) {
+  return new SHARCTargetAsmStreamer(S, OS);
+}
+
+static MCTargetStreamer *
+createSHARCObjectTargetStreamer(MCStreamer &S, const MCSubtargetInfo &STI) {
+  return new SHARCTargetELFStreamer(S, STI);
+}
+
+static MCTargetStreamer *createSHARCNullTargetStreamer(MCStreamer &S) {
+  return new SHARCTargetStreamer(S);
+}
+
 extern "C" LLVM_EXTERNAL_VISIBILITY void
 LLVMInitializeSHARCTargetMC() {
   Target &T = getTheSHARCTarget();
@@ -71,4 +87,8 @@ LLVMInitializeSHARCTargetMC() {
   TargetRegistry::RegisterMCInstPrinter(T, createSHARCMCInstPrinter);
   TargetRegistry::RegisterMCCodeEmitter(T, createSHARCMCCodeEmitter);
   TargetRegistry::RegisterMCAsmBackend(T, createSHARCAsmBackend);
+  TargetRegistry::RegisterAsmTargetStreamer(T, createSHARCAsmTargetStreamer);
+  TargetRegistry::RegisterObjectTargetStreamer(T,
+                                               createSHARCObjectTargetStreamer);
+  TargetRegistry::RegisterNullTargetStreamer(T, createSHARCNullTargetStreamer);
 }

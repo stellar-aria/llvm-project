@@ -18,6 +18,7 @@
 
 #include "MCTargetDesc/SHARCMCTargetDesc.h"
 #include "MCTargetDesc/SHARCSyntax.h"
+#include "MCTargetDesc/SHARCTargetStreamer.h"
 #include "TargetInfo/SHARCTargetInfo.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -35,6 +36,7 @@
 #include "llvm/MC/MCParser/MCParsedAsmOperand.h"
 #include "llvm/MC/MCParser/MCTargetAsmParser.h"
 #include "llvm/MC/MCRegisterInfo.h"
+#include "llvm/MC/MCSectionELF.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -93,6 +95,9 @@ struct XorDest {
 struct State {
   SmallVector<std::pair<std::string, Value>, 12> Fields;
   SmallVector<XorDest, 1> Deferred;
+  /// Template keywords read as symbols ("MR0F" in "R3 = MR0F"): a parse
+  /// that needs fewer wins.
+  unsigned KeywordSymbols = 0;
 
   const Value *get(StringRef N) const {
     for (const auto &F : Fields)
@@ -131,8 +136,8 @@ class SHARCAsmParser : public MCTargetAsmParser {
   // buffer, and literal tokens point into it.
   BumpPtrAllocator Alloc;
   StringSaver Saver{Alloc};
-  // Identifiers used as keywords in some template (MRF, LCE, DM, ...):
-  // never symbols.
+  // Identifiers used as keywords in some template (MRF, LCE, DM, F, ...).
+  // They may still be symbols, but a parse that avoids that is preferred.
   StringSet<> Reserved;
   SmallVector<unsigned, 64> Forms;
   SmallVector<unsigned, 400> Computes;
@@ -145,9 +150,16 @@ class SHARCAsmParser : public MCTargetAsmParser {
     size_t Pos;
     MCInst *Inst;
     SmallVector<std::pair<std::string, Value>, 1> ParentFields;
+    unsigned KeywordSymbols;
   };
   DenseMap<std::pair<unsigned, size_t>, SmallVector<Nested, 2>> NestedMemo;
   std::optional<MCInst> Parsed;
+
+  // Section modes. A code section holds VISA code if it has SHF_SHARC_VISA,
+  // or if VISA is the default (-mattr=+visa-section) and .isa was not used
+  // in it. The visa-section feature tracks the current section's mode.
+  bool DefaultVISA;
+  SmallPtrSet<const MCSection *, 4> ExplicitISA;
 
   // Availability checks lifted while looking for a better diagnostic.
   enum Relax : unsigned {
@@ -163,7 +175,8 @@ public:
                  const MCInstrInfo &MII)
       : MCTargetAsmParser(STI, MII),
         MRI(*Parser.getContext().getRegisterInfo()),
-        AsmInfo(Parser.getContext().getAsmInfo()) {
+        AsmInfo(Parser.getContext().getAsmInfo()),
+        DefaultVISA(STI.hasFeature(SHARC::FeatureVISASection)) {
     buildRegisterNames();
     for (unsigned Opc = 0; Opc < MII.getNumOpcodes(); ++Opc) {
       if (getSyntaxRows(Opc).empty())
@@ -195,6 +208,9 @@ public:
   void convertToMapAndConstraints(unsigned Kind,
                                   const OperandVector &Operands) override {}
   ParseStatus parseDirective(AsmToken DirectiveID) override;
+  void flushPendingInstructions(MCStreamer &Out) override {
+    syncSectionMode();
+  }
 
   /// "R0 = R1 + R2;" is an instruction, not a symbol assignment.
   bool equalIsAsmAssignment() override { return false; }
@@ -216,6 +232,12 @@ private:
   Seq parseTemplate(StringRef T);
 
   bool available(unsigned Opc) const;
+  MCSectionELF *codeSection();
+  bool syncSectionMode();
+  SHARCTargetStreamer &targetStreamer() {
+    return static_cast<SHARCTargetStreamer &>(
+        *getParser().getStreamer().getTargetStreamer());
+  }
   MCInst *matchStatement();
   const FeatureBitset &features() const { return getSTI().getFeatureBits(); }
 
@@ -560,8 +582,7 @@ std::optional<std::pair<size_t, Value>> SHARCAsmParser::immAt(size_t Pos) {
     V.I = Neg ? -Toks[Pos].getIntVal() : Toks[Pos].getIntVal();
     return std::make_pair(Pos + 1, V);
   }
-  if (Neg || !Toks[Pos].is(AsmToken::Identifier) || regAt(Pos) ||
-      Reserved.contains(Toks[Pos].getString().upper()))
+  if (Neg || !Toks[Pos].is(AsmToken::Identifier) || regAt(Pos))
     return std::nullopt;
   MCContext &Ctx = getContext();
   const MCExpr *E = MCSymbolRefExpr::create(
@@ -621,7 +642,7 @@ ArrayRef<SHARCAsmParser::Nested> SHARCAsmParser::nestedAt(OpKind Kind,
       MCInst *I = build(Opc, S);
       if (!I)
         continue;
-      Nested Nd{P, I, {}};
+      Nested Nd{P, I, {}, S.KeywordSymbols};
       for (const auto &F : S.Fields)
         if (StringRef(F.first).starts_with("^"))
           Nd.ParentFields.push_back({F.first.substr(1), F.second});
@@ -718,6 +739,7 @@ void SHARCAsmParser::matchPlaceholder(unsigned Opc, const Node &N, size_t Pos,
       V.Kind = Value::Inst;
       V.In = Nd.Inst;
       bool OK = NS.set(N.Name, V);
+      NS.KeywordSymbols += Nd.KeywordSymbols;
       for (const auto &[F, FV] : Nd.ParentFields)
         OK = OK && NS.set(F, FV);
       if (OK)
@@ -741,6 +763,8 @@ void SHARCAsmParser::matchPlaceholder(unsigned Opc, const Node &N, size_t Pos,
       return;
     if (N.Fmt == 'L' && V->second.Kind != Value::Expr)
       return;
+    bool Keyword = V->second.Kind == Value::Expr &&
+                   Reserved.contains(Toks[Pos].getString().upper());
     if (V->second.Kind == Value::Imm) {
       int64_t X = V->second.I;
       unsigned W = O->Width;
@@ -756,6 +780,7 @@ void SHARCAsmParser::matchPlaceholder(unsigned Opc, const Node &N, size_t Pos,
         V->second.I = uint64_t(X) & maskTrailingOnes<uint64_t>(W);
     }
     State NS = St;
+    NS.KeywordSymbols += Keyword;
     if (NS.set(N.Name, V->second))
       Out.push_back({V->first, std::move(NS)});
     return;
@@ -895,6 +920,28 @@ MCInst *SHARCAsmParser::build(unsigned Opc, const State &In) {
 // Statements
 //===----------------------------------------------------------------------===//
 
+/// The current section if it holds code.
+MCSectionELF *SHARCAsmParser::codeSection() {
+  // SHARC objects are always ELF.
+  auto *Sec = static_cast<MCSectionELF *>(
+      getParser().getStreamer().getCurrentSectionOnly());
+  if (!Sec || !(Sec->getFlags() & ELF::SHF_EXECINSTR))
+    return nullptr;
+  return Sec;
+}
+
+/// Set the visa-section feature from the current section. Returns whether
+/// the section holds VISA code.
+bool SHARCAsmParser::syncSectionMode() {
+  bool VISA = false;
+  if (MCSectionELF *Sec = codeSection())
+    VISA = (Sec->getFlags() & ELF::SHF_SHARC_VISA) ||
+           (DefaultVISA && !ExplicitISA.contains(Sec));
+  if (VISA != getSTI().hasFeature(SHARC::FeatureVISASection))
+    copySTI().ToggleFeature(SHARC::FeatureVISASection);
+  return VISA;
+}
+
 bool SHARCAsmParser::parseInstruction(ParseInstructionInfo &Info,
                                       StringRef Name, SMLoc NameLoc,
                                       OperandVector &Operands) {
@@ -916,6 +963,14 @@ bool SHARCAsmParser::parseInstruction(ParseInstructionInfo &Info,
 
   if (!HasSemicolon)
     return Error(EndLoc, "expected ';'");
+  if (syncSectionMode()) {
+    if (!getSTI().hasFeature(SHARC::FeatureVISA))
+      return Error(NameLoc,
+                   "VISA code requires an ADSP-214xx or SHARC+ processor");
+    // Record the mode in the object when VISA is only the default.
+    if (MCSectionELF *Sec = codeSection())
+      Sec->setFlags(Sec->getFlags() | ELF::SHF_SHARC_VISA);
+  }
   if (MCInst *I = matchStatement()) {
     Parsed = *I;
     return false;
@@ -939,12 +994,13 @@ bool SHARCAsmParser::parseInstruction(ParseInstructionInfo &Info,
   return Error(NameLoc, "invalid SHARC instruction");
 }
 
-/// Of the forms that match the whole statement, the smallest.
+/// Of the forms that match the whole statement, the one reading the fewest
+/// keywords as symbols, then the smallest.
 MCInst *SHARCAsmParser::matchStatement() {
   MCInst *Best = nullptr;
-  unsigned BestSize = ~0u;
+  std::pair<unsigned, unsigned> BestKey(~0u, ~0u);
   for (unsigned Opc : Forms) {
-    if (!available(Opc) || MII.get(Opc).getSize() >= BestSize)
+    if (!available(Opc))
       continue;
     for (const SyntaxRow &R : getSyntaxRows(Opc)) {
       if (*R.Part)
@@ -954,14 +1010,17 @@ MCInst *SHARCAsmParser::matchStatement() {
         continue;
       Matches M;
       matchSeq(Opc, getTemplate(R.Template), 0, 0, std::move(St), M);
-      MCInst *I = nullptr;
-      for (auto &[P, S] : M)
-        if (P == Toks.size() && (I = build(Opc, S)))
-          break;
-      if (I) {
-        Best = I;
-        BestSize = MII.get(Opc).getSize();
-        break;
+      for (auto &[P, S] : M) {
+        if (P != Toks.size())
+          continue;
+        std::pair<unsigned, unsigned> Key(S.KeywordSymbols,
+                                          MII.get(Opc).getSize());
+        if (Key >= BestKey)
+          continue;
+        if (MCInst *I = build(Opc, S)) {
+          Best = I;
+          BestKey = Key;
+        }
       }
     }
   }
@@ -981,8 +1040,33 @@ bool SHARCAsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
 }
 
 /// .word: 32-bit data words, like .4byte.
+/// .isa / .visa: the current section holds ISA or VISA code.
 ParseStatus SHARCAsmParser::parseDirective(AsmToken DirectiveID) {
-  if (DirectiveID.getString() != ".word")
+  StringRef Dir = DirectiveID.getString();
+  if (Dir == ".isa" || Dir == ".visa") {
+    if (parseEOL())
+      return ParseStatus::Failure;
+    bool VISA = Dir == ".visa";
+    if (VISA && !getSTI().hasFeature(SHARC::FeatureVISA))
+      return Error(DirectiveID.getLoc(),
+                   ".visa requires an ADSP-214xx or SHARC+ processor");
+    auto *Sec = static_cast<MCSectionELF *>(
+        getParser().getStreamer().getCurrentSectionOnly());
+    if (!Sec)
+      return Error(DirectiveID.getLoc(), Dir + " outside a section");
+    if (VISA) {
+      Sec->setFlags(Sec->getFlags() | ELF::SHF_SHARC_VISA);
+      ExplicitISA.erase(Sec);
+      targetStreamer().emitDirectiveVISA();
+    } else {
+      Sec->setFlags(Sec->getFlags() & ~ELF::SHF_SHARC_VISA);
+      ExplicitISA.insert(Sec);
+      targetStreamer().emitDirectiveISA();
+    }
+    syncSectionMode();
+    return ParseStatus::Success;
+  }
+  if (Dir != ".word")
     return ParseStatus::NoMatch;
   auto ParseOne = [&]() -> bool {
     const MCExpr *Value;

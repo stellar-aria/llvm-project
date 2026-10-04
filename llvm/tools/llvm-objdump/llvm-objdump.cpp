@@ -2095,6 +2095,13 @@ disassembleObject(ObjectFile &Obj, const ObjectFile &DbgObj,
     if (SymbolizeOperands && Obj.isRelocatableObject())
       ReadBBAddrMap(Section.getIndex());
 
+    if (SecondaryTarget && Obj.isELF() && Obj.getArch() == Triple::sharc) {
+      bool VISA = ELFSectionRef(Section).getFlags() & ELF::SHF_SHARC_VISA;
+      bool PrimaryVISA =
+          PrimaryTarget.SubtargetInfo->checkFeatures("+visa-section");
+      DT = VISA == PrimaryVISA ? &PrimaryTarget : &*SecondaryTarget;
+    }
+
     // Get the list of all the symbols in this section.
     SectionSymbolsTy &Symbols = AllSymbols[Section];
     auto &MappingSymbols = AllMappingSymbols[Section];
@@ -2846,7 +2853,15 @@ static void disassembleObject(ObjectFile *Obj, bool InlineRelocs,
   // appropriate.
   std::optional<DisassemblerTarget> SecondaryTarget;
 
-  if (isArmElf(*Obj)) {
+  if (Obj->isELF() && Obj->getArch() == Triple::sharc) {
+    // SHARC code sections hold ISA or VISA code (SHF_SHARC_VISA); the other
+    // mode's disassembler toggles visa-section.
+    Features.AddFeature(
+        PrimaryTarget.SubtargetInfo->checkFeatures("+visa-section")
+            ? "-visa-section"
+            : "+visa-section");
+    SecondaryTarget.emplace(PrimaryTarget, Features);
+  } else if (isArmElf(*Obj)) {
     if (!PrimaryTarget.SubtargetInfo->checkFeatures("+mclass")) {
       if (PrimaryTarget.SubtargetInfo->checkFeatures("+thumb-mode"))
         Features.AddFeature("-thumb-mode");

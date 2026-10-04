@@ -6,6 +6,7 @@ add_llvm_component_library(LLVMSHARCDesc
   SHARCMCCodeEmitter.cpp
   SHARCMCTargetDesc.cpp
   SHARCSyntax.cpp
+  SHARCTargetStreamer.cpp
 
   LINK_COMPONENTS
   MC

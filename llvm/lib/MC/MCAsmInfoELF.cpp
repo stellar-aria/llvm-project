@@ -148,6 +148,9 @@ void MCAsmInfoELF::printSwitchToSection(const MCSection &Section,
   } else if (Arch == Triple::x86_64) {
     if (Sec.Flags & ELF::SHF_X86_64_LARGE)
       OS << 'l';
+  } else if (Arch == Triple::sharc) {
+    if (Sec.Flags & ELF::SHF_SHARC_VISA)
+      OS << 'v';
   }
 
   OS << '"';

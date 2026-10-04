@@ -25,6 +25,8 @@ SHARCMCAsmInfo::SHARCMCAsmInfo(const Triple &TT,
   MinInstAlignment = 2;
   InternalSymbolPrefix = ".L";
   UsesELFSectionDirectiveForBSS = true;
+  // .word is a 32-bit data word (the parser's directive).
+  Data32bitsDirective = "\t.word\t";
   SupportsDebugInformation = true;
   // Must agree with Triple::getDefaultExceptionHandling().
   ExceptionsType = ExceptionHandling::DwarfCFI;
