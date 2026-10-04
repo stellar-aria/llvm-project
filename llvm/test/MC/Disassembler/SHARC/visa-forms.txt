@@ -1,0 +1,92 @@
+# RUN: llvm-mc --disassemble -triple=sharc -mcpu=adsp-214xx -mattr=+visa-section %s | FileCheck %s
+#
+# VISA code: 16-, 32- and 48-bit forms, the length decoded from the leading
+# bits (PGR p446). Expected text from the PRM tables (page in each comment).
+
+# Type 21c, PRM 17-12
+# CHECK: NOP;
+0x01 0x00
+
+# Type 2c short compute RN = RN + RX, PRM 14-11 / 18-2
+# CHECK-NEXT: R0 = R0 + R1;
+0x01 0xc0
+
+# Type 2c FN = FN * FX (opcode 1111)
+# CHECK-NEXT: F4 = F4 * F9;
+0x49 0xcf
+
+# Type 2b, PRM 14-10
+# CHECK-NEXT: R0 = R1 + R2;
+0x80 0x01 0x12 0x10
+
+# Type 2a is also valid VISA
+# CHECK-NEXT: IF EQ R0 = R1 + R2;
+0x00 0x01 0x00 0x00 0x12 0x10
+
+# Type 1b, PRM 14-6
+# CHECK-NEXT: R8 = DM(I4, M1), PM(I12, M12) = R0;
+0x71 0x28 0x3f 0x20
+
+# Type 3b plain (l/x/w = 0/1/1), PRM 14-16
+# CHECK-NEXT: IF NE R6 = PM(I9, M10);
+0xa1 0x52 0x3f 0x03
+
+# Type 3b (LW): l/x/w = 1/1/1 (PGR 9-12)
+# CHECK-NEXT: DM(M2, I1) = I5 (LW);
+0xbe 0x42 0xbf 0xca
+
+# Type 3c, PRM 14-20
+# CHECK-NEXT: DM(I3, M7) = R11;
+0xfb 0x97
+
+# Type 4b plain (l/x/w = 1/1/1), PRM 14-29
+# CHECK-NEXT: R2 = DM(-5, I6);
+0x3f 0x6c 0x3f 0xd9
+
+# Type 5b move, PRM 14-39
+# CHECK-NEXT: IF LT M3 = USTAT2;
+0x02 0x77 0xbf 0x91
+
+# Type 5b swap, PRM 14-40
+# CHECK-NEXT: R1 <-> S14;
+0xbe 0x7b 0xbf 0x00
+
+# Type 7b, PRM 14-49
+# CHECK-NEXT: I10 = MODIFY(I8, M15);
+0x7e 0x04 0x3f 0x3a
+
+# Type 9b relative, PRM 15-9
+# CHECK-NEXT: IF TF CALL (PC, -8) (DB);
+0x9b 0x09 0x3f 0xc4
+
+# Type 9b indirect
+# CHECK-NEXT: JUMP (M9, I10);
+0x3e 0x08 0x3f 0x88
+
+# Type 11c, PRM 15-20
+# CHECK-NEXT: IF EQ RTS (DB);
+0xc0 0x0a
+
+# Type 15b, PRM 16-10
+# CHECK-NEXT: R7 = DM(-2, I3);
+0x08 0x96 0xfe 0x03
+
+# Type 16b, PRM 16-14
+# CHECK-NEXT: PM(I8, M9) = 0x1234;
+0x64 0x90 0x34 0x12
+
+# Type 17b, PRM 16-17
+# CHECK-NEXT: R0 = 0x1234;
+0x80 0x0f 0x34 0x12
+
+# Type 22c, PRM 17-14, PGR 10-27 (IDL bit 39 = 1)
+# CHECK-NEXT: IDLE;
+0x81 0x00
+
+# Type 22c EMUIDLE
+# CHECK-NEXT: EMUIDLE;
+0xc1 0x00
+
+# Type 25c, PRM 17-18
+# CHECK-NEXT: RFRAME;
+0x01 0x19

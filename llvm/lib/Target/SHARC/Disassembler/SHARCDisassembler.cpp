@@ -214,17 +214,69 @@ static DecodeStatus decodeShiftImmOperand(MCInst &Inst, uint64_t Field,
 // Instruction decoding
 //===----------------------------------------------------------------------===//
 
+namespace {
+struct FormLength {
+  uint64_t Mask, Value;
+  uint8_t Width, Lead, Fixed;
+};
+
+const FormLength VisaForms[] = {
+#define SHARC_FORM(NAME, WIDTH, MASK, VALUE, LEAD, FIXED)                      \
+  {MASK, VALUE, WIDTH, LEAD, FIXED},
+#include "SHARCFormLengths.def"
+#undef SHARC_FORM
+};
+} // namespace
+
+/// The length of the VISA instruction at the top of a 48-bit window: among
+/// the forms whose fixed bits match, the one with the longest run of fixed
+/// bits from bit 47 wins, then the one with the most fixed bits. Returns 0
+/// if nothing matches.
+static unsigned visaLength(uint64_t W) {
+  const FormLength *Best = nullptr;
+  for (const FormLength &F : VisaForms) {
+    if ((W & F.Mask) != F.Value)
+      continue;
+    if (!Best || F.Lead > Best->Lead ||
+        (F.Lead == Best->Lead && F.Fixed > Best->Fixed))
+      Best = &F;
+  }
+  return Best ? Best->Width : 0;
+}
+
 DecodeStatus SHARCDisassembler::getInstruction(MCInst &MI, uint64_t &Size,
                                                ArrayRef<uint8_t> Bytes,
                                                uint64_t Address,
                                                raw_ostream &CS) const {
   unsigned Avail;
   uint64_t W = SHARC::readWindow(Bytes, Avail);
-  // ISA code: every instruction is 48 bits.
-  if (Avail < 3) {
-    Size = Avail * 2;
-    return MCDisassembler::Fail;
+  // A failed decode skips one parcel, the smallest instruction unit.
+  Size = std::min(Avail, 1u) * 2;
+
+  unsigned Width = 48;
+  if (STI.hasFeature(SHARC::FeatureVISASection)) {
+    Width = visaLength(W);
+    if (Width == 0)
+      return MCDisassembler::Fail;
   }
-  Size = 6;
-  return decodeInstruction(DecoderTableForm48, MI, W, Address, this, STI);
+  if (Width / 16 > Avail)
+    return MCDisassembler::Fail;
+
+  DecodeStatus S;
+  switch (Width) {
+  case 16:
+    S = decodeInstruction(DecoderTableForm16, MI, uint32_t(W >> 32), Address,
+                          this, STI);
+    break;
+  case 32:
+    S = decodeInstruction(DecoderTableForm32, MI, uint32_t(W >> 16), Address,
+                          this, STI);
+    break;
+  default:
+    S = decodeInstruction(DecoderTableForm48, MI, W, Address, this, STI);
+    break;
+  }
+  if (S != MCDisassembler::Fail)
+    Size = Width / 8;
+  return S;
 }

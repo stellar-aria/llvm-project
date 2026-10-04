@@ -1,0 +1,14 @@
+## The same bits decode differently in ISA and VISA code (PGR p443): a Type 2c
+## parcel (1100...) is the start of a Type 10a instruction in ISA code.
+# RUN: echo "0x01 0xc0 0x00 0x00 0x00 0x00" | \
+# RUN:   llvm-mc --disassemble -triple=sharc -mcpu=adsp-214xx | FileCheck %s --check-prefix=ISA
+# RUN: echo "0x01 0xc0 0x00 0x00 0x00 0x00 0x00 0x00" | \
+# RUN:   llvm-mc --disassemble -triple=sharc -mcpu=adsp-214xx -mattr=+visa-section \
+# RUN:   | FileCheck %s --check-prefix=VISA
+
+## Type 10a: cond 0, d=0, pmi=4 (bit 32), everything else zero (PRM 15-13).
+# ISA: IF EQ JUMP (M8, I12), ELSE R0 = DM(I0, M0);
+
+## Type 2c then a 48-bit Type 21a.
+# VISA: R0 = R0 + R1;
+# VISA-NEXT: NOP;

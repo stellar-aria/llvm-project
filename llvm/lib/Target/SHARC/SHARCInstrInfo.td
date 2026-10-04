@@ -992,15 +992,16 @@ def T22a : SHARCInst48<(outs), (ins uimm1_op:$emu), "", []> {
 }
 
 // Type22c (pgr values + prm layout)
+// Hand edit: bit 39 (IDL) is fixed to 1 as in Type 22a. The PGR grid (10-27)
+// shows IDL as a field, but with IDL = 0 the encoding is Type 21c NOP.
 def T22c : SHARCInst16<(outs), (ins uimm1_op:$emu), "", []> {
   let DecoderNamespace = "Form";
   let Predicates = [HasVISA];
   bits<1> emu;
   let Inst{15-8} = 0b00000000;
+  let Inst{7} = 0b1;
   let Inst{0} = 0b1;
   let Inst{6} = emu{0};
-  let Inst{7} = 0;
-  let SoftFail{7} = 0b1;
   let Inst{5-1} = 0;
   let SoftFail{5-1} = 0b11111;
 }

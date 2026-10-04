@@ -140,6 +140,12 @@ Manual errata
      - EMU and IDL rows of Type 22a contradict each other
      - emu = 1 is EMUIDLE
      - PRM Type 22a table (17-13) is unambiguous.
+   * - PGR
+     - 10-27 (Type 22c grid)
+     - Bit 39 (IDL) is a field
+     - Bit 39 is fixed at 1
+     - With IDL = 0 a Type 22c word is the Type 21c NOP; Type 22a fixes the
+       same bit at 1 (PRM 17-13 figure).
    * - PRM
      - 14-16 (Type 3b BH table)
      - No (LW) row
