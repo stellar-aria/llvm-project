@@ -9,6 +9,7 @@
 #ifndef LLVM_LIB_TARGET_SHARC_MCTARGETDESC_SHARCINSTPRINTER_H
 #define LLVM_LIB_TARGET_SHARC_MCTARGETDESC_SHARCINSTPRINTER_H
 
+#include "llvm/ADT/StringSet.h"
 #include "llvm/MC/MCInstPrinter.h"
 
 namespace llvm {
@@ -30,9 +31,11 @@ public:
                  const MCSubtargetInfo &STI, raw_ostream &OS) override;
 
   /// Print a form or computation without the trailing ';'. Returns false
-  /// if no syntax row accounts for the encoding.
+  /// if no syntax row accounts for the encoding. A computation may read its
+  /// form's fields ("$^dataex"); their names are added to \p ParentUsed.
   bool printSyntax(const MCInst &MI, const MCSubtargetInfo &STI,
-                   raw_ostream &OS);
+                   raw_ostream &OS, const MCInst *Parent = nullptr,
+                   StringSet<> *ParentUsed = nullptr);
 };
 
 } // end namespace llvm

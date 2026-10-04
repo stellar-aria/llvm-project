@@ -1,4 +1,4 @@
-# RUN: llvm-mc -triple=sharc -mcpu=adsp-2137x -show-encoding %s | FileCheck %s
+# RUN: llvm-mc -triple=sharc -mcpu=adsp-214xx -show-encoding %s | FileCheck %s
 # Every computation in SHARCComputeSyntax.def, as Type 2a.
 # Expected encodings are from digiemu's compute and form tables.
 

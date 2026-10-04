@@ -47,6 +47,8 @@ class Renderer {
   SHARCInstPrinter &Printer;
   const MCRegisterInfo &MRI;
   const MCAsmInfo &MAI;
+  const MCInst *Parent;
+  StringSet<> *ParentUsed;
 
 public:
   StringSet<> Used;
@@ -55,8 +57,9 @@ public:
 
   Renderer(const MCInst &MI, const MCSubtargetInfo &STI,
            SHARCInstPrinter &Printer, const MCRegisterInfo &MRI,
-           const MCAsmInfo &MAI)
-      : MI(MI), STI(STI), Printer(Printer), MRI(MRI), MAI(MAI) {}
+           const MCAsmInfo &MAI, const MCInst *Parent, StringSet<> *ParentUsed)
+      : MI(MI), STI(STI), Printer(Printer), MRI(MRI), MAI(MAI), Parent(Parent),
+        ParentUsed(ParentUsed) {}
 
   void render(StringRef T, raw_ostream &OS);
   bool unusedFieldsAreZero() const;
@@ -69,6 +72,7 @@ private:
   void printImm(int64_t V, unsigned Width, char Fmt, raw_ostream &OS);
   void printReg(MCRegister Reg, OpKind Kind, raw_ostream &OS);
   int64_t field(StringRef Name);
+  unsigned fieldWidth(StringRef Name);
 };
 
 } // namespace
@@ -134,7 +138,7 @@ void Renderer::render(StringRef T, raw_ostream &OS) {
         for (StringRef &A : Args)
           A = A.trim();
         I = E + 1;
-      } else if (Name == "cat") {
+      } else if (Name == "cat" || Name == "bl6") {
         size_t E = T.find(')', I);
         T.slice(I + 1, E).split(Args, ',');
         for (StringRef &A : Args)
@@ -177,7 +181,29 @@ void Renderer::renderPart(StringRef Name, raw_ostream &OS) {
     Failed = true;
 }
 
+unsigned Renderer::fieldWidth(StringRef Name) {
+  bool Up = Name.consume_front("^");
+  const OperandInfo *O =
+      Up ? (Parent ? findOperand(Parent->getOpcode(), Name) : nullptr)
+         : findOperand(MI.getOpcode(), Name);
+  if (!O) {
+    Failed = true;
+    return 1;
+  }
+  return O->Width;
+}
+
 int64_t Renderer::field(StringRef Name) {
+  if (Name.consume_front("^")) {
+    std::optional<int64_t> V;
+    if (Parent && ParentUsed) {
+      ParentUsed->insert(Name);
+      V = getField(*Parent, Name);
+    }
+    if (!V)
+      Failed = true;
+    return V.value_or(0);
+  }
   Used.insert(Name);
   std::optional<int64_t> V = getField(MI, Name);
   if (!V) {
@@ -256,13 +282,17 @@ void Renderer::renderPlaceholder(StringRef Name, ArrayRef<StringRef> Args,
     OS << MRI.getName(dagRegister(MRI, Name[0], Index));
     return;
   }
-  if (Name == "cat") {
-    const OperandInfo *Hi = findOperand(MI.getOpcode(), Args[0]);
-    const OperandInfo *Lo = findOperand(MI.getOpcode(), Args[1]);
-    assert(Hi && Lo && "$cat names unknown fields");
-    uint64_t LoV = uint64_t(field(Args[1])) & maskTrailingOnes<uint64_t>(Lo->Width);
-    int64_t V = int64_t((uint64_t(field(Args[0])) << Lo->Width) | LoV);
-    printImm(V, Hi->Width + Lo->Width, Fmt ? Fmt : 's', OS);
+  if (Name == "cat" || Name == "bl6") {
+    unsigned HiW = fieldWidth(Args[0]), LoW = fieldWidth(Args[1]);
+    uint64_t LoV = uint64_t(field(Args[1])) & maskTrailingOnes<uint64_t>(LoW);
+    int64_t V = int64_t((uint64_t(field(Args[0])) << LoW) | LoV);
+    if (Name == "cat") {
+      printImm(V, HiW + LoW, Fmt ? Fmt : 's', OS);
+      return;
+    }
+    // <bit6>:<len6>: the low six bits are the bit position, the high six the
+    // field length (PGR Table 10-1, DATAEX).
+    OS << (V & 63) << ':' << ((V >> 6) & 63);
     return;
   }
 
@@ -289,7 +319,7 @@ void Renderer::renderPlaceholder(StringRef Name, ArrayRef<StringRef> Args,
       Absent = true;
       return;
     }
-    if (!Printer.printSyntax(*Op.getInst(), STI, OS))
+    if (!Printer.printSyntax(*Op.getInst(), STI, OS, &MI, &Used))
       Failed = true;
     return;
   case OpKind::UImm:
@@ -325,11 +355,13 @@ bool Renderer::unusedFieldsAreZero() const {
 }
 
 bool SHARCInstPrinter::printSyntax(const MCInst &MI, const MCSubtargetInfo &STI,
-                                   raw_ostream &OS) {
+                                   raw_ostream &OS, const MCInst *Parent,
+                                   StringSet<> *ParentUsed) {
   for (const SyntaxRow &R : getSyntaxRows(MI.getOpcode())) {
     if (*R.Part || !condsHold(MI, R.Conds, STI.getFeatureBits()))
       continue;
-    Renderer Rd(MI, STI, *this, MRI, MAI);
+    StringSet<> PUsed;
+    Renderer Rd(MI, STI, *this, MRI, MAI, Parent, &PUsed);
     Rd.Used.clear();
     SmallString<64> Text;
     raw_svector_ostream TOS(Text);
@@ -341,6 +373,9 @@ bool SHARCInstPrinter::printSyntax(const MCInst &MI, const MCSubtargetInfo &STI,
     Rd.render(R.Template, TOS);
     if (Rd.Failed || !Rd.unusedFieldsAreZero())
       continue;
+    if (ParentUsed)
+      for (const auto &U : PUsed)
+        ParentUsed->insert(U.getKey());
     OS << Text;
     return true;
   }

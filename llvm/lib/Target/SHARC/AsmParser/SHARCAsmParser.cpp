@@ -46,6 +46,9 @@
 using namespace llvm;
 using namespace llvm::SHARC;
 
+#define GET_COMPUTE_FEATURES
+#include "SHARCGenInstrInfo.inc"
+
 #define DEBUG_TYPE "sharc-asm-parser"
 
 namespace {
@@ -135,10 +138,24 @@ class SHARCAsmParser : public MCTargetAsmParser {
 
   // Per-statement state.
   SmallVector<AsmToken, 32> Toks;
-  DenseMap<std::pair<unsigned, size_t>,
-           SmallVector<std::pair<size_t, MCInst *>, 2>>
-      NestedMemo;
+  /// A computation matched at some position, with the fields of the
+  /// enclosing form it sets ("^dataex").
+  struct Nested {
+    size_t Pos;
+    MCInst *Inst;
+    SmallVector<std::pair<std::string, Value>, 1> ParentFields;
+  };
+  DenseMap<std::pair<unsigned, size_t>, SmallVector<Nested, 2>> NestedMemo;
   std::optional<MCInst> Parsed;
+
+  // Availability checks lifted while looking for a better diagnostic.
+  enum Relax : unsigned {
+    RelaxSHARCPlus = 1,
+    RelaxFP64 = 2,
+    RelaxVISASection = 4,
+    RelaxVISA = 8,
+  };
+  unsigned Relaxed = 0;
 
 public:
   SHARCAsmParser(const MCSubtargetInfo &STI, MCAsmParser &Parser,
@@ -196,6 +213,7 @@ private:
   Seq parseTemplate(StringRef T);
 
   bool available(unsigned Opc) const;
+  MCInst *matchStatement();
   const FeatureBitset &features() const { return getSTI().getFeatureBits(); }
 
   void matchSeq(unsigned Opc, const Seq &S, size_t I, size_t Pos, State St,
@@ -213,7 +231,8 @@ private:
 
   std::optional<std::pair<MCRegister, bool>> regAt(size_t Pos) const;
   std::optional<std::pair<size_t, Value>> immAt(size_t Pos);
-  ArrayRef<std::pair<size_t, MCInst *>> nestedAt(OpKind Kind, size_t Pos);
+  ArrayRef<Nested> nestedAt(OpKind Kind, size_t Pos);
+  unsigned fieldWidth(unsigned Opc, StringRef Name) const;
   MCInst *build(unsigned Opc, const State &St);
   bool isEnd(size_t Pos) const { return Pos >= Toks.size(); }
 };
@@ -301,7 +320,8 @@ Seq SHARCAsmParser::parseTemplate(StringRef T) {
         ++I;
       N.Name = T.slice(B, I).str();
       N.Kind = C == '%' ? Node::Part : Node::Placeholder;
-      if (C == '$' && I < T.size() && T[I] == '(') {
+      if (C == '$' && I < T.size() && T[I] == '(' &&
+          is_contained({"I", "M", "B", "Ix", "Bx", "cat", "bl6"}, N.Name)) {
         size_t E = T.find(')', I);
         SmallVector<StringRef, 3> Args;
         T.slice(I + 1, E).split(Args, ',');
@@ -320,23 +340,22 @@ Seq SHARCAsmParser::parseTemplate(StringRef T) {
 }
 
 /// Whether a form or computation exists for the current subtarget and section
-/// mode (ISA code is all 48-bit; Type 10a is not valid VISA, PGR p226).
+/// mode: its TableGen predicates hold, and ISA code is all 48-bit.
 bool SHARCAsmParser::available(unsigned Opc) const {
-  StringRef Name = MII.getName(Opc);
-  bool VISASection = features()[SHARC::FeatureVISASection];
-  if (!isComputation(Opc)) {
-    if (MII.get(Opc).getSize() < 6 && !VISASection)
-      return false;
-    if (Name.starts_with("T10a_") && VISASection)
-      return false;
-    if (is_contained({"T3d", "T4d", "T7d", "T14d", "T26a"}, Name) &&
-        !features()[SHARC::FeatureSHARCPlus])
-      return false;
-    return true;
-  }
-  if (Name.starts_with("C_ALU64_") || Name.starts_with("C_MUL64_"))
-    return features()[SHARC::FeatureFP64];
-  return true;
+  FeatureBitset FB = features();
+  if (Relaxed & RelaxSHARCPlus)
+    FB.set(SHARC::FeatureSHARCPlus);
+  if (Relaxed & RelaxFP64)
+    FB.set(SHARC::FeatureFP64);
+  if (Relaxed & RelaxVISA)
+    FB.set(SHARC::FeatureVISA);
+  bool VISASection = FB[SHARC::FeatureVISASection];
+  if (Relaxed & RelaxVISASection)
+    FB.reset(SHARC::FeatureVISASection);
+  if (!isComputation(Opc) && MII.get(Opc).getSize() < 6 && !VISASection)
+    return false;
+  FeatureBitset Required = SHARC_MC::computeRequiredFeatures(Opc);
+  return (SHARC_MC::computeAvailableFeatures(FB) & Required) == Required;
 }
 
 //===----------------------------------------------------------------------===//
@@ -556,18 +575,31 @@ std::optional<std::pair<size_t, Value>> SHARCAsmParser::immAt(size_t Pos) {
   return std::make_pair(Pos, V);
 }
 
+/// The width of a field, or of a field of the enclosing form ("^dataex").
+unsigned SHARCAsmParser::fieldWidth(unsigned Opc, StringRef Name) const {
+  if (!Name.consume_front("^")) {
+    const OperandInfo *O = findOperand(Opc, Name);
+    assert(O && "syntax template names an unknown field");
+    return O->Width;
+  }
+  for (unsigned F : Forms)
+    if (const OperandInfo *O = findOperand(F, Name))
+      return O->Width;
+  llvm_unreachable("no form has the named field");
+}
+
 static bool inClass(const MCRegisterInfo &MRI, unsigned RC, MCRegister R) {
   return MRI.getRegClass(RC).contains(R);
 }
 
 /// Computations that can start at \p Pos, memoized per statement.
-ArrayRef<std::pair<size_t, MCInst *>> SHARCAsmParser::nestedAt(OpKind Kind,
-                                                               size_t Pos) {
+ArrayRef<SHARCAsmParser::Nested> SHARCAsmParser::nestedAt(OpKind Kind,
+                                                          size_t Pos) {
   auto Key = std::make_pair(unsigned(Kind), Pos);
   auto It = NestedMemo.find(Key);
   if (It != NestedMemo.end())
     return It->second;
-  SmallVector<std::pair<size_t, MCInst *>, 2> Found;
+  SmallVector<Nested, 2> Found;
   for (unsigned Opc : Computes) {
     StringRef Name = MII.getName(Opc);
     bool Want = Kind == OpKind::ShortCompute ? Name.starts_with("SC_")
@@ -578,9 +610,16 @@ ArrayRef<std::pair<size_t, MCInst *>> SHARCAsmParser::nestedAt(OpKind Kind,
     Matches M;
     matchSeq(Opc, getTemplate(getSyntaxRows(Opc)[0].Template), 0, Pos, State(),
              M);
-    for (auto &[P, S] : M)
-      if (MCInst *I = build(Opc, S))
-        Found.push_back({P, I});
+    for (auto &[P, S] : M) {
+      MCInst *I = build(Opc, S);
+      if (!I)
+        continue;
+      Nested Nd{P, I, {}};
+      for (const auto &F : S.Fields)
+        if (StringRef(F.first).starts_with("^"))
+          Nd.ParentFields.push_back({F.first.substr(1), F.second});
+      Found.push_back(std::move(Nd));
+    }
   }
   return NestedMemo[Key] = Found;
 }
@@ -612,21 +651,36 @@ void SHARCAsmParser::matchPlaceholder(unsigned Opc, const Node &N, size_t Pos,
     Out.push_back({Pos + 1, std::move(NS)});
     return;
   }
-  if (N.Name == "cat") {
-    auto V = immAt(Pos);
-    const OperandInfo *Hi = findOperand(Opc, N.Args[0]);
-    const OperandInfo *Lo = findOperand(Opc, N.Args[1]);
-    if (!V || V->second.Kind != Value::Imm)
-      return;
-    unsigned W = Hi->Width + Lo->Width;
-    int64_t X = V->second.I;
-    if (!isIntN(W, X))
-      return;
+  if (N.Name == "cat" || N.Name == "bl6") {
+    unsigned HiW = fieldWidth(Opc, N.Args[0]), LoW = fieldWidth(Opc, N.Args[1]);
+    unsigned W = HiW + LoW;
+    int64_t X;
+    size_t Next;
+    if (N.Name == "cat") {
+      auto V = immAt(Pos);
+      if (!V || V->second.Kind != Value::Imm)
+        return;
+      X = V->second.I;
+      Next = V->first;
+      if (!isIntN(W, X) && !isUIntN(W, X))
+        return;
+    } else {
+      // <bit6>:<len6>.
+      if (Pos + 2 >= Toks.size() || !Toks[Pos].is(AsmToken::Integer) ||
+          !Toks[Pos + 1].is(AsmToken::Colon) ||
+          !Toks[Pos + 2].is(AsmToken::Integer))
+        return;
+      int64_t Bit = Toks[Pos].getIntVal(), Len = Toks[Pos + 2].getIntVal();
+      if (!isUInt<6>(Bit) || !isUInt<6>(Len))
+        return;
+      X = Len << 6 | Bit;
+      Next = Pos + 3;
+    }
     uint64_t U = uint64_t(X) & maskTrailingOnes<uint64_t>(W);
     State NS = St;
-    if (NS.setImm(N.Args[0], U >> Lo->Width) &&
-        NS.setImm(N.Args[1], U & maskTrailingOnes<uint64_t>(Lo->Width)))
-      Out.push_back({V->first, std::move(NS)});
+    if (NS.setImm(N.Args[0], U >> LoW) &&
+        NS.setImm(N.Args[1], U & maskTrailingOnes<uint64_t>(LoW)))
+      Out.push_back({Next, std::move(NS)});
     return;
   }
 
@@ -651,13 +705,16 @@ void SHARCAsmParser::matchPlaceholder(unsigned Opc, const Node &N, size_t Pos,
   case OpKind::Compute:
   case OpKind::ShortCompute:
   case OpKind::ShiftImm:
-    for (auto [P, I] : nestedAt(O->Kind, Pos)) {
+    for (const Nested &Nd : nestedAt(O->Kind, Pos)) {
       State NS = St;
       Value V;
       V.Kind = Value::Inst;
-      V.In = I;
-      if (NS.set(N.Name, V))
-        Out.push_back({P, std::move(NS)});
+      V.In = Nd.Inst;
+      bool OK = NS.set(N.Name, V);
+      for (const auto &[F, FV] : Nd.ParentFields)
+        OK = OK && NS.set(F, FV);
+      if (OK)
+        Out.push_back({Nd.Pos, std::move(NS)});
     }
     return;
   case OpKind::UImm:
@@ -840,7 +897,33 @@ bool SHARCAsmParser::parseInstruction(ParseInstructionInfo &Info,
   bool HasSemicolon =
       Lexer.is(AsmToken::EndOfStatement) && Lexer.getTok().getString() == ";";
 
-  // Of the forms that match the whole statement, take the smallest.
+  if (!HasSemicolon)
+    return Error(EndLoc, "expected ';'");
+  if (MCInst *I = matchStatement()) {
+    Parsed = *I;
+    return false;
+  }
+  // Explain a statement that would be valid elsewhere.
+  static const std::pair<unsigned, const char *> Reasons[] = {
+      {RelaxSHARCPlus, "instruction requires: sharcplus"},
+      {RelaxFP64, "instruction requires: fp64"},
+      {RelaxVISA, "instruction requires: visa"},
+      {RelaxVISASection, "Type 10 instructions are not available in VISA code"},
+  };
+  for (auto [R, Msg] : Reasons) {
+    Relaxed = R;
+    NestedMemo.clear();
+    bool Found = matchStatement();
+    Relaxed = 0;
+    NestedMemo.clear();
+    if (Found)
+      return Error(NameLoc, Msg);
+  }
+  return Error(NameLoc, "invalid SHARC instruction");
+}
+
+/// Of the forms that match the whole statement, the smallest.
+MCInst *SHARCAsmParser::matchStatement() {
   MCInst *Best = nullptr;
   unsigned BestSize = ~0u;
   for (unsigned Opc : Forms) {
@@ -865,13 +948,7 @@ bool SHARCAsmParser::parseInstruction(ParseInstructionInfo &Info,
       }
     }
   }
-
-  if (!HasSemicolon)
-    return Error(EndLoc, "expected ';'");
-  if (!Best)
-    return Error(NameLoc, "invalid SHARC instruction");
-  Parsed = *Best;
-  return false;
+  return Best;
 }
 
 bool SHARCAsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,

@@ -53,7 +53,7 @@ foreach n = [1, 3, 4, 8] in
   }
 
 // Immediate data, possibly an expression resolved by a fixup.
-foreach n = [6, 7, 16, 32] in
+foreach n = [6, 7, 8, 16, 32] in
   def imm#n#_op : Operand<i32> {
     let EncoderMethod = "getImmOpValue";
     let DecoderMethod = "decodeImmOperand<"#n#">";

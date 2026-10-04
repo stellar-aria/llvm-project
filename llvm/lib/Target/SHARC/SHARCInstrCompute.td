@@ -2435,7 +2435,7 @@ def C_MUL64_00110011 : SHARCCompute23<(ins DBL_op:$rn, FREG_op:$rx, FREG_op:$ry)
   let Inst{3-0} = ry;
 }
 
-def SI_000000 : SHARCCompute23<(ins uimm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = LSHIFT $rx BY $data"> {
+def SI_000000 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = LSHIFT $rx BY $data:s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;
@@ -2457,7 +2457,7 @@ def C_SHIFT_00000000 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
   let Inst{3-0} = ry;
 }
 
-def SI_000001 : SHARCCompute23<(ins uimm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = ASHIFT $rx BY $data"> {
+def SI_000001 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = ASHIFT $rx BY $data:s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;
@@ -2479,7 +2479,7 @@ def C_SHIFT_00000100 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
   let Inst{3-0} = ry;
 }
 
-def SI_000010 : SHARCCompute23<(ins uimm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = ROT $rx BY $data"> {
+def SI_000010 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = ROT $rx BY $data:s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;
@@ -2501,7 +2501,7 @@ def C_SHIFT_00001000 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
   let Inst{3-0} = ry;
 }
 
-def SI_001000 : SHARCCompute23<(ins uimm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR LSHIFT $rx BY $data"> {
+def SI_001000 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR LSHIFT $rx BY $data:s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;
@@ -2523,7 +2523,7 @@ def C_SHIFT_00100000 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
   let Inst{3-0} = ry;
 }
 
-def SI_001001 : SHARCCompute23<(ins uimm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR ASHIFT $rx BY $data"> {
+def SI_001001 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR ASHIFT $rx BY $data:s"> {
   let DecoderNamespace = "ShiftImm";
   bits<8> data;
   bits<4> rn;
@@ -2591,6 +2591,7 @@ def C_SHIFT_01001100 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
 
 def C_SHIFT_01010000 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx), "$rn = BITEXT $rx"> {
   let DecoderNamespace = "Compute";
+  let Predicates = [HasVISA]; // Hand edit: ADSP-214xx and later.
   bits<4> rn;
   bits<4> rx;
   let Inst{22-12} = 0b01001010000;
@@ -2602,6 +2603,7 @@ def C_SHIFT_01010000 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx), "$rn = BITEXT 
 
 def C_SHIFT_01011000 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx), "$rn = BITEXT $rx (NU)"> {
   let DecoderNamespace = "Compute";
+  let Predicates = [HasVISA]; // Hand edit: ADSP-214xx and later.
   bits<4> rn;
   bits<4> rx;
   let Inst{22-12} = 0b01001011000;
@@ -2635,6 +2637,7 @@ def C_SHIFT_01101100 : SHARCCompute23<(ins RFREG:$rn, RFREG:$rx, RFREG:$ry), "$r
 
 def C_SHIFT_01110000 : SHARCCompute23<(ins RFREG:$rn), "$rn = BFFWRP"> {
   let DecoderNamespace = "Compute";
+  let Predicates = [HasVISA]; // Hand edit: ADSP-214xx and later.
   bits<4> rn;
   let Inst{22-12} = 0b01001110000;
   let Inst{11-8} = rn;
@@ -2644,6 +2647,7 @@ def C_SHIFT_01110000 : SHARCCompute23<(ins RFREG:$rn), "$rn = BFFWRP"> {
 
 def C_SHIFT_01111100 : SHARCCompute23<(ins RFREG:$rn), "BFFWRP = $rn"> {
   let DecoderNamespace = "Compute";
+  let Predicates = [HasVISA]; // Hand edit: ADSP-214xx and later.
   bits<4> rn;
   let Inst{22-12} = 0b01001111100;
   let Inst{11-8} = rn;
@@ -3466,4 +3470,168 @@ def SC_1111 : SHARCCompute12<(ins FREG_op:$rn, FREG_op:$rx), "$rn = $rn * $rx"> 
   let Inst{11-8} = 0b1111;
   let Inst{7-4} = rn;
   let Inst{3-0} = rx;
+}
+
+//===----------------------------------------------------------------------===//
+// Hand-written (not generated): shift immediates and bit operations from PGR
+// Table 12-11, which the encoding table lists wrongly or not at all. The
+// shift-immediate opcode is the upper six bits of the 8-bit shift opcode
+// (PGR Table 12-2). The 12-bit immediates of FEXT, FDEP, BITEXT and BITDEP
+// are DATAEX (a field of Type 6a) above DATA (PGR Table 10-1). BITEXT,
+// BITDEP and BFFWRP are ADSP-214xx and later (Table 12-11 note).
+//===----------------------------------------------------------------------===//
+def SI_010000 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = FEXT $rx BY $bl6(^dataex,data)"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rn;
+  bits<4> rx;
+  let Inst{22-16} = 0b0010000;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = rx;
+}
+def SI_010010 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = FEXT $rx BY $bl6(^dataex,data) (SE)"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rn;
+  bits<4> rx;
+  let Inst{22-16} = 0b0010010;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = rx;
+}
+def SI_010001 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = FDEP $rx BY $bl6(^dataex,data)"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rn;
+  bits<4> rx;
+  let Inst{22-16} = 0b0010001;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = rx;
+}
+def SI_010011 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = FDEP $rx BY $bl6(^dataex,data) (SE)"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rn;
+  bits<4> rx;
+  let Inst{22-16} = 0b0010011;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = rx;
+}
+def SI_011001 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR FDEP $rx BY $bl6(^dataex,data)"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rn;
+  bits<4> rx;
+  let Inst{22-16} = 0b0011001;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = rx;
+}
+def SI_011011 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = $rn OR FDEP $rx BY $bl6(^dataex,data) (SE)"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rn;
+  bits<4> rx;
+  let Inst{22-16} = 0b0011011;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = rx;
+}
+def SI_010100 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn), "$rn = BITEXT $cat(^dataex,data):d"> {
+  let DecoderNamespace = "ShiftImm";
+  let Predicates = [HasVISA];
+  bits<8> data;
+  bits<4> rn;
+  let Inst{22-16} = 0b0010100;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = 0;
+  let SoftFail{3-0} = 0b1111;
+}
+def SI_010110 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn), "$rn = BITEXT $cat(^dataex,data):d (NU)"> {
+  let DecoderNamespace = "ShiftImm";
+  let Predicates = [HasVISA];
+  bits<8> data;
+  bits<4> rn;
+  let Inst{22-16} = 0b0010110;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = 0;
+  let SoftFail{3-0} = 0b1111;
+}
+def SI_011101 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rx), "BITDEP $rx BY $cat(^dataex,data):d"> {
+  let DecoderNamespace = "ShiftImm";
+  let Predicates = [HasVISA];
+  bits<8> data;
+  bits<4> rx;
+  let Inst{22-16} = 0b0011101;
+  let Inst{15-8} = data;
+  let Inst{3-0} = rx;
+  let Inst{7-4} = 0;
+  let SoftFail{7-4} = 0b1111;
+}
+def SI_011111 : SHARCCompute23<(ins imm8_op:$data), "BFFWRP = $data:d"> {
+  let DecoderNamespace = "ShiftImm";
+  let Predicates = [HasVISA];
+  bits<8> data;
+  let Inst{22-16} = 0b0011111;
+  let Inst{15-8} = data;
+  let Inst{7-4} = 0;
+  let SoftFail{7-4} = 0b1111;
+  let Inst{3-0} = 0;
+  let SoftFail{3-0} = 0b1111;
+}
+def SI_110000 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = BSET $rx BY $data:d"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rn;
+  bits<4> rx;
+  let Inst{22-16} = 0b0110000;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = rx;
+}
+def SI_110001 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = BCLR $rx BY $data:d"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rn;
+  bits<4> rx;
+  let Inst{22-16} = 0b0110001;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = rx;
+}
+def SI_110010 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rn, RFREG:$rx), "$rn = BTGL $rx BY $data:d"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rn;
+  bits<4> rx;
+  let Inst{22-16} = 0b0110010;
+  let Inst{15-8} = data;
+  let Inst{7-4} = rn;
+  let Inst{3-0} = rx;
+}
+def SI_110011 : SHARCCompute23<(ins imm8_op:$data, RFREG:$rx), "BTST $rx BY $data:d"> {
+  let DecoderNamespace = "ShiftImm";
+  bits<8> data;
+  bits<4> rx;
+  let Inst{22-16} = 0b0110011;
+  let Inst{15-8} = data;
+  let Inst{3-0} = rx;
+  let Inst{7-4} = 0;
+  let SoftFail{7-4} = 0b1111;
+}
+def C_SHIFT_01110100 : SHARCCompute23<(ins RFREG:$rx, RFREG:$ry), "BITDEP $rx BY $ry"> {
+  let DecoderNamespace = "Compute";
+  let Predicates = [HasVISA];
+  bits<4> rx;
+  bits<4> ry;
+  let Inst{22-12} = 0b01001110100;
+  let Inst{11-8} = 0;
+  let SoftFail{11-8} = 0b1111;
+  let Inst{7-4} = rx;
+  let Inst{3-0} = ry;
 }
