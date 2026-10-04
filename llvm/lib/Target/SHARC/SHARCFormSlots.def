@@ -1,0 +1,91 @@
+//===-- SHARCFormSlots.def - Syntax family of each form ----------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// SHARC_FORM_KIND(Form, Kind, Page)
+//
+// Each instruction form belongs to one syntax family. The printer and parser
+// implement each family once and read the form's fields by name, using the
+// field meanings of PGR Table 10-1 (p18117 text, printed 10-1..10-4):
+//   d = 1: memory write          u = 1: post-modify (I, M) with update
+//   g = 1: DAG2 (I/M 8-15)       l = 1: long word access (LW)
+//   b = 1: CALL (else JUMP)      j = 1: delayed branch (DB)
+//   a = 1: loop abort (LA)       ci = 1: clear interrupt (CI)
+//   e = 1: ELSE clause           lr = 1: loop reentry (LR)
+// Page is the SHARC+ Core Programming Reference (PRM) printed page of the
+// form's syntax section, which covers both classic and SHARC+ forms.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SHARC_FORM_KIND
+#error "SHARC_FORM_KIND must be defined"
+#endif
+
+// Group I: conditional compute and move or modify (PRM ch. 14).
+SHARC_FORM_KIND(T1a, DualMove, "14-3")
+SHARC_FORM_KIND(T1b, DualMove, "14-6")
+SHARC_FORM_KIND(T2a, Compute, "14-8")
+SHARC_FORM_KIND(T2b, Compute, "14-10")
+SHARC_FORM_KIND(T2c, ShortCompute, "14-11")
+SHARC_FORM_KIND(T3a, UregMem, "14-12")
+SHARC_FORM_KIND(T3b, UregMem, "14-16")
+SHARC_FORM_KIND(T3c, DregMemShort, "14-20")
+SHARC_FORM_KIND(T3d, UregMemEx, "14-22")
+SHARC_FORM_KIND(T4a, ImmModMem, "14-26")
+SHARC_FORM_KIND(T4b, ImmModMem, "14-29")
+SHARC_FORM_KIND(T4d, ImmModMem, "14-32")
+SHARC_FORM_KIND(T5a_move, RegMove, "14-35")
+SHARC_FORM_KIND(T5a_swap, RegSwap, "14-37")
+SHARC_FORM_KIND(T5b_move, RegMove, "14-39")
+SHARC_FORM_KIND(T5b_swap, RegSwap, "14-40")
+SHARC_FORM_KIND(T6a_mem, ShiftImmMem, "14-42")
+SHARC_FORM_KIND(T6a_nomem, ShiftImm, "14-44")
+SHARC_FORM_KIND(T7a, Modify, "14-46")
+SHARC_FORM_KIND(T7b, Modify, "14-49")
+SHARC_FORM_KIND(T7d, AddrSwitch, "14-50")
+
+// Group II: program flow control (PRM ch. 15).
+SHARC_FORM_KIND(T8a_abs, Branch, "15-2")
+SHARC_FORM_KIND(T8a_rel, Branch, "15-2")
+SHARC_FORM_KIND(T9a_abs, BranchIndirect, "15-5")
+SHARC_FORM_KIND(T9a_rel, BranchIndirect, "15-5")
+SHARC_FORM_KIND(T9b_abs, BranchIndirect, "15-9")
+SHARC_FORM_KIND(T9b_rel, BranchIndirect, "15-9")
+SHARC_FORM_KIND(T10a_abs, BranchMem, "15-13")
+SHARC_FORM_KIND(T10a_rel, BranchMem, "15-13")
+SHARC_FORM_KIND(T11a, Return, "15-16")
+SHARC_FORM_KIND(T11c, Return, "15-20")
+SHARC_FORM_KIND(T12a_imm, LoopCount, "15-23")
+SHARC_FORM_KIND(T12a_ureg, LoopCount, "15-24")
+SHARC_FORM_KIND(T13a, Loop, "15-25")
+
+// Group III: immediate data move (PRM ch. 16).
+SHARC_FORM_KIND(T14a, UregAbsMem, "16-2")
+SHARC_FORM_KIND(T14d, UregAbsMemEx, "16-4")
+SHARC_FORM_KIND(T15a, UregMemImm, "16-7")
+SHARC_FORM_KIND(T15b, UregMemImm, "16-10")
+SHARC_FORM_KIND(T16a, MemStoreImm, "16-13")
+SHARC_FORM_KIND(T16b, MemStoreImm, "16-14")
+SHARC_FORM_KIND(T17a, UregImm, "16-16")
+SHARC_FORM_KIND(T17b, UregImm, "16-17")
+
+// Group IV: miscellaneous (PRM ch. 17).
+SHARC_FORM_KIND(T18a, BitOp, "17-2")
+SHARC_FORM_KIND(T19a, IModifyImm, "17-4")
+SHARC_FORM_KIND(T19a_bitrev, IBitrev, "17-6")
+SHARC_FORM_KIND(T20a, Stack, "17-7")
+SHARC_FORM_KIND(T21a, Nop, "17-11")
+SHARC_FORM_KIND(T21c, Nop, "17-12")
+SHARC_FORM_KIND(T22a, Idle, "17-13")
+SHARC_FORM_KIND(T22c, Idle, "17-14")
+SHARC_FORM_KIND(T25a_direct, CJump, "17-15")
+SHARC_FORM_KIND(T25a_pcrel, CJump, "17-16")
+SHARC_FORM_KIND(T25a_rframe, RFrame, "17-17")
+SHARC_FORM_KIND(T25c_rframe, RFrame, "17-18")
+SHARC_FORM_KIND(T26a, Sync, "17-19")
+
+#undef SHARC_FORM_KIND

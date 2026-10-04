@@ -21,6 +21,15 @@ def FeatureFP64 : SubtargetFeature<"fp64", "HasFP64", "true",
 def FeatureSHARCPlus : SubtargetFeature<"sharcplus", "IsSHARCPlus", "true",
     "SHARC+ core", [FeatureVISA, FeatureByteAddr, FeatureFP64]>;
 
+// Internal: the code being assembled or disassembled is linked into
+// short-word space (a section with SHF_SHARC_VISA). The same bits decode
+// differently in ISA and VISA code (PGR p443).
+def FeatureVISASection : SubtargetFeature<"visa-section", "InVISASection",
+    "true", "Code is in a VISA (short-word space) section">;
+
+def NotInVISASection : Predicate<"!Subtarget->inVISASection()">,
+                       AssemblerPredicate<(all_of (not FeatureVISASection))>;
+
 def HasVISA : Predicate<"Subtarget->hasVISA()">,
               AssemblerPredicate<(all_of FeatureVISA)>;
 def IsSHARCPlus : Predicate<"Subtarget->isSHARCPlus()">,
