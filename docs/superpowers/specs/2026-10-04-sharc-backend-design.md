@@ -289,9 +289,10 @@ M1 is implemented. Against the criteria:
 - **Not fully met:** the SHARC+ firmware corpus round-trips 21,493 of 21,494
   documented-form words. The remaining one is Type 18a with bit 36 set; it is
   decoded with a warning because the manuals do not define the bit.
-- **Not met:** the classic-SHARC corpus. The Digitakt mk1 DSP section is not
-  in the SHARC+ boot-stream format, so digiemu's loader needs a 214xx
-  boot-stream parser before this can run.
+- **Not met:** the classic-SHARC corpus. No classic-SHARC image is available
+  locally. The Digitakt and Digitone mk1 run their DSP code on a second
+  ColdFire, not a SHARC. The classic encodings are covered by the sweep and by
+  MAME's ADSP-2106x disassembler.
 
 ## 7. Out of scope for M1
 
