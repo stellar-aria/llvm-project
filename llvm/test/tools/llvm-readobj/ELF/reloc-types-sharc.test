@@ -1,0 +1,68 @@
+## Test that llvm-readobj shows proper relocation type
+## names and values for the SHARC target.
+
+# RUN: yaml2obj %s -o %t-sharc.o
+# RUN: llvm-readobj -r %t-sharc.o | FileCheck %s
+
+# CHECK: 0x0 R_SHARC_NONE - 0x0
+# CHECK-NEXT: 0x4 R_SHARC_DATA32 - 0x0
+# CHECK-NEXT: 0x8 R_SHARC_ADDR24_NW - 0x0
+# CHECK-NEXT: 0xC R_SHARC_ADDR24_SW - 0x0
+# CHECK-NEXT: 0x10 R_SHARC_ADDR32_NW - 0x0
+# CHECK-NEXT: 0x14 R_SHARC_ADDR32_SW - 0x0
+# CHECK-NEXT: 0x18 R_SHARC_ADDR32_LW - 0x0
+# CHECK-NEXT: 0x1C R_SHARC_ADDR32_BYTE - 0x0
+# CHECK-NEXT: 0x20 R_SHARC_PCREL24_ISA - 0x0
+# CHECK-NEXT: 0x24 R_SHARC_PCREL24_VISA - 0x0
+# CHECK-NEXT: 0x28 R_SHARC_PCREL23_ISA - 0x0
+# CHECK-NEXT: 0x2C R_SHARC_PCREL23_VISA - 0x0
+# CHECK-NEXT: 0x30 R_SHARC_PCREL6_ISA - 0x0
+# CHECK-NEXT: 0x34 R_SHARC_PCREL6_VISA - 0x0
+# CHECK-NEXT: 0x38 R_SHARC_IMM16 - 0x0
+# CHECK-NEXT: 0x3C R_SHARC_IMM7 - 0x0
+# CHECK-NEXT: 0x40 R_SHARC_IMM6 - 0x0
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS32
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_SHARC
+Sections:
+  - Name:         .rela.text
+    Type:         SHT_RELA
+    Relocations:
+       - Offset: 0x0000000000000000
+         Type:   R_SHARC_NONE
+       - Offset: 0x0000000000000004
+         Type:   R_SHARC_DATA32
+       - Offset: 0x0000000000000008
+         Type:   R_SHARC_ADDR24_NW
+       - Offset: 0x000000000000000C
+         Type:   R_SHARC_ADDR24_SW
+       - Offset: 0x0000000000000010
+         Type:   R_SHARC_ADDR32_NW
+       - Offset: 0x0000000000000014
+         Type:   R_SHARC_ADDR32_SW
+       - Offset: 0x0000000000000018
+         Type:   R_SHARC_ADDR32_LW
+       - Offset: 0x000000000000001C
+         Type:   R_SHARC_ADDR32_BYTE
+       - Offset: 0x0000000000000020
+         Type:   R_SHARC_PCREL24_ISA
+       - Offset: 0x0000000000000024
+         Type:   R_SHARC_PCREL24_VISA
+       - Offset: 0x0000000000000028
+         Type:   R_SHARC_PCREL23_ISA
+       - Offset: 0x000000000000002C
+         Type:   R_SHARC_PCREL23_VISA
+       - Offset: 0x0000000000000030
+         Type:   R_SHARC_PCREL6_ISA
+       - Offset: 0x0000000000000034
+         Type:   R_SHARC_PCREL6_VISA
+       - Offset: 0x0000000000000038
+         Type:   R_SHARC_IMM16
+       - Offset: 0x000000000000003C
+         Type:   R_SHARC_IMM7
+       - Offset: 0x0000000000000040
+         Type:   R_SHARC_IMM6

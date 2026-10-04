@@ -1,0 +1,31 @@
+## Check that the SHARC file format, arch and EF_SHARC_MACH_* flags are dumped.
+
+# RUN: yaml2obj %s -o %t.2136x -DMACH=2136X
+# RUN: llvm-readobj --file-headers %t.2136x | FileCheck --check-prefixes=ALL,M2136X %s
+# RUN: yaml2obj %s -o %t.2137x -DMACH=2137X
+# RUN: llvm-readobj --file-headers %t.2137x | FileCheck --check-prefixes=ALL,M2137X %s
+# RUN: yaml2obj %s -o %t.214xx -DMACH=214XX
+# RUN: llvm-readobj --file-headers %t.214xx | FileCheck --check-prefixes=ALL,M214XX %s
+# RUN: yaml2obj %s -o %t.plus -DMACH=SHARCPLUS
+# RUN: llvm-readobj --file-headers %t.plus | FileCheck --check-prefixes=ALL,PLUS %s
+# RUN: obj2yaml %t.plus | FileCheck --check-prefix=YAML %s
+
+# ALL:    Format: elf32-sharc
+# ALL:    Arch: sharc
+# ALL:    Machine: EM_SHARC (0x85)
+# ALL:    Flags [
+# M2136X:   EF_SHARC_MACH_2136X (0x1)
+# M2137X:   EF_SHARC_MACH_2137X (0x2)
+# M214XX:   EF_SHARC_MACH_214XX (0x3)
+# PLUS:     EF_SHARC_MACH_SHARCPLUS (0x4)
+# ALL:    ]
+
+# YAML: Flags: [ EF_SHARC_MACH_SHARCPLUS ]
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS32
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_SHARC
+  Flags:   [ EF_SHARC_MACH_[[MACH]] ]

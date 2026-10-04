@@ -1444,6 +1444,11 @@ constexpr EnumStringDef<unsigned, 2> ElfHexagonSectionFlagsDefs[] = {
 constexpr auto ElfHexagonSectionFlags =
     BUILD_ENUM_STRINGS(ElfHexagonSectionFlagsDefs);
 
+constexpr EnumStringDef<unsigned, 2> ElfSHARCSectionFlagsDefs[] = {
+    ENUM_ENT(SHF_SHARC_VISA, "v")};
+constexpr auto ElfSHARCSectionFlags =
+    BUILD_ENUM_STRINGS(ElfSHARCSectionFlagsDefs);
+
 constexpr EnumStringDef<unsigned, 2> ElfMipsSectionFlagsDefs[] = {
     ENUM_ENT(SHF_MIPS_NODUPES, ""), ENUM_ENT(SHF_MIPS_NAMES, ""),
     ENUM_ENT(SHF_MIPS_LOCAL, ""),   ENUM_ENT(SHF_MIPS_NOSTRIP, ""),
@@ -1483,6 +1488,10 @@ getSectionFlagsForTarget(unsigned EOSAbi, unsigned EMachine) {
     break;
   case EM_HEXAGON:
     for (const auto &Entry : EnumStrings(ElfHexagonSectionFlags))
+      Ret.push_back(&Entry);
+    break;
+  case EM_SHARC:
+    for (const auto &Entry : EnumStrings(ElfSHARCSectionFlags))
       Ret.push_back(&Entry);
     break;
   case EM_MIPS:
@@ -1827,6 +1836,15 @@ constexpr EnumStringDef<unsigned, 2> ElfHeaderXtensaFlagsDefs[] = {
 };
 constexpr auto ElfHeaderXtensaFlags =
     BUILD_ENUM_STRINGS(ElfHeaderXtensaFlagsDefs);
+
+constexpr EnumStringDef<unsigned, 2> ElfHeaderSHARCFlagsDefs[] = {
+    ENUM_ENT(EF_SHARC_MACH_2136X, "adsp-2136x"),
+    ENUM_ENT(EF_SHARC_MACH_2137X, "adsp-2137x"),
+    ENUM_ENT(EF_SHARC_MACH_214XX, "adsp-214xx"),
+    ENUM_ENT(EF_SHARC_MACH_SHARCPLUS, "sharcplus"),
+};
+constexpr auto ElfHeaderSHARCFlags =
+    BUILD_ENUM_STRINGS(ElfHeaderSHARCFlagsDefs);
 
 constexpr EnumStringDef<unsigned, 2> ElfSymOtherFlagsDefs[] = {
     ENUM_ENT_1(STV_INTERNAL),
@@ -3817,6 +3835,9 @@ template <class ELFT> void GNUELFDumper<ELFT>::printFileHeaders() {
   else if (e.e_machine == EM_XTENSA)
     ElfFlags = printFlags(e.e_flags, EnumStrings(ElfHeaderXtensaFlags),
                           unsigned(ELF::EF_XTENSA_MACH));
+  else if (e.e_machine == EM_SHARC)
+    ElfFlags = printFlags(e.e_flags, EnumStrings(ElfHeaderSHARCFlags),
+                          unsigned(ELF::EF_SHARC_MACH));
   else if (e.e_machine == EM_CUDA) {
     unsigned Mask = e.e_ident[ELF::EI_ABIVERSION] == ELF::ELFABIVERSION_CUDA_V1
                         ? ELF::EF_CUDA_SM
@@ -7775,6 +7796,9 @@ template <class ELFT> void LLVMELFDumper<ELFT>::printFileHeaders() {
     else if (E.e_machine == EM_XTENSA)
       W.printFlags("Flags", E.e_flags, EnumStrings(ElfHeaderXtensaFlags),
                    unsigned(ELF::EF_XTENSA_MACH));
+    else if (E.e_machine == EM_SHARC)
+      W.printFlags("Flags", E.e_flags, EnumStrings(ElfHeaderSHARCFlags),
+                   unsigned(ELF::EF_SHARC_MACH));
     else if (E.e_machine == EM_CUDA)
       W.printFlags("Flags", E.e_flags, EnumStrings(ElfHeaderNVPTXFlags),
                    unsigned(ELF::EF_CUDA_SM));

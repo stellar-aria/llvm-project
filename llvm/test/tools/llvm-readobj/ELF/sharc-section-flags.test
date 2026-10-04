@@ -1,0 +1,40 @@
+## Check that SHF_SHARC_VISA is dumped and round-trips through obj2yaml.
+
+# RUN: yaml2obj %s -o %t.o
+# RUN: llvm-readobj -S %t.o | FileCheck %s
+# RUN: llvm-readelf -S %t.o | FileCheck %s --check-prefix=GNU
+# RUN: obj2yaml %t.o | FileCheck %s --check-prefix=YAML
+
+# CHECK:      Name: .text.isa
+# CHECK-NEXT: Type: SHT_PROGBITS
+# CHECK-NEXT: Flags [ (0x6)
+# CHECK-NEXT:   SHF_ALLOC
+# CHECK-NEXT:   SHF_EXECINSTR
+# CHECK-NEXT: ]
+# CHECK:      Name: .text.visa
+# CHECK-NEXT: Type: SHT_PROGBITS
+# CHECK-NEXT: Flags [ (0x10000006)
+# CHECK-NEXT:   SHF_ALLOC
+# CHECK-NEXT:   SHF_EXECINSTR
+# CHECK-NEXT:   SHF_SHARC_VISA
+# CHECK-NEXT: ]
+
+# GNU: .text.visa PROGBITS {{.*}} AXv
+
+# YAML:      Name: .text.visa
+# YAML-NEXT: Type: SHT_PROGBITS
+# YAML-NEXT: Flags: [ SHF_ALLOC, SHF_EXECINSTR, SHF_SHARC_VISA ]
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS32
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_SHARC
+Sections:
+  - Name:  .text.isa
+    Type:  SHT_PROGBITS
+    Flags: [ SHF_ALLOC, SHF_EXECINSTR ]
+  - Name:  .text.visa
+    Type:  SHT_PROGBITS
+    Flags: [ SHF_ALLOC, SHF_EXECINSTR, SHF_SHARC_VISA ]

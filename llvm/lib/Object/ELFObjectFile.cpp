@@ -387,6 +387,21 @@ SubtargetFeatures ELFObjectFileBase::getLoongArchFeatures() const {
   return Features;
 }
 
+StringRef ELFObjectFileBase::getSHARCCPUName() const {
+  switch (getPlatformFlags() & ELF::EF_SHARC_MACH) {
+  case ELF::EF_SHARC_MACH_2136X:
+    return "adsp-2136x";
+  case ELF::EF_SHARC_MACH_2137X:
+    return "adsp-2137x";
+  case ELF::EF_SHARC_MACH_214XX:
+    return "adsp-214xx";
+  case ELF::EF_SHARC_MACH_SHARCPLUS:
+    return "adsp-2156x";
+  default:
+    return "";
+  }
+}
+
 Expected<SubtargetFeatures> ELFObjectFileBase::getFeatures() const {
   switch (getEMachine()) {
   case ELF::EM_MIPS:
@@ -415,6 +430,8 @@ std::optional<StringRef> ELFObjectFileBase::tryGetCPUName() const {
     return StringRef("future");
   case ELF::EM_BPF:
     return StringRef("v4");
+  case ELF::EM_SHARC:
+    return getSHARCCPUName();
   default:
     return std::nullopt;
   }

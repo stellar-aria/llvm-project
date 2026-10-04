@@ -96,6 +96,7 @@ public:
     x86_64,         // X86-64: amd64, x86_64
     xcore,          // XCore: xcore
     xtensa,         // Tensilica: Xtensa
+    sharc,          // Analog Devices: SHARC, SHARC+
     nvptx,          // NVPTX: 32-bit
     nvptx64,        // NVPTX: 64-bit
     amdil,          // AMDIL

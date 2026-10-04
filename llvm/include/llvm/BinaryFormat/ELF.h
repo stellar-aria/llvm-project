@@ -1105,6 +1105,22 @@ enum {
 #include "ELFRelocs/Xtensa.def"
 };
 
+// SHARC specific e_flags
+enum : unsigned {
+  // Four-bit SHARC processor family mask.
+  EF_SHARC_MACH = 0x0000000f,
+  EF_SHARC_MACH_NONE = 0x00000000,
+  EF_SHARC_MACH_2136X = 0x00000001,
+  EF_SHARC_MACH_2137X = 0x00000002,
+  EF_SHARC_MACH_214XX = 0x00000003,
+  EF_SHARC_MACH_SHARCPLUS = 0x00000004,
+};
+
+// ELF Relocation types for SHARC
+enum {
+#include "ELFRelocs/SHARC.def"
+};
+
 #undef ELF_RELOC
 
 // Section header.
@@ -1324,6 +1340,9 @@ enum : unsigned {
   // All sections with the GPREL flag are grouped into a global data area
   // for faster accesses
   SHF_HEX_GPREL = 0x10000000,
+
+  // Section holds VISA code, linked into short-word space.
+  SHF_SHARC_VISA = 0x10000000,
 
   // Section contains text/data which may be replicated in other sections.
   // Linker must retain only one copy.

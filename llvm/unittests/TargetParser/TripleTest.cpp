@@ -4073,4 +4073,19 @@ TEST(DataLayoutTest, CheriRISCV32) {
               testing::HasSubstr("A200-P200-G200"));
 }
 
+
+TEST(TripleTest, SHARC) {
+  Triple T("sharc-unknown-elf");
+  EXPECT_EQ(Triple::sharc, T.getArch());
+  EXPECT_EQ("sharc", Triple::getArchTypeName(Triple::sharc));
+  EXPECT_EQ("sharc", Triple::getArchTypePrefix(Triple::sharc));
+  EXPECT_EQ(Triple::ELF, T.getObjectFormat());
+  EXPECT_TRUE(T.isArch32Bit());
+  EXPECT_TRUE(T.isLittleEndian());
+  EXPECT_EQ(Triple::sharc, T.get32BitArchVariant().getArch());
+  EXPECT_EQ(Triple::UnknownArch, T.get64BitArchVariant().getArch());
+  EXPECT_EQ(Triple::UnknownArch, T.getBigEndianArchVariant().getArch());
+  EXPECT_EQ(Triple::sharc, T.getLittleEndianArchVariant().getArch());
+}
+
 } // end anonymous namespace
