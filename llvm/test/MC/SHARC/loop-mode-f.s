@@ -10,16 +10,25 @@ r0 = r0 + r1;
 a: r0 = r0 + r1;
 # CHECK: DO (PC, 2) UNTIL LCE (F);
 
+## (A branch may not be one of the last three, PGR 4-55.)
 LCNTR = 4, DO b UNTIL LCE;
-JUMP (PC, 2);
+JUMP (PC, 4);
+nop;
+nop;
 nop;
 b: nop;
-# CHECK: DO (PC, 3) UNTIL LCE;
+# CHECK: DO (PC, 5) UNTIL LCE;
 
+## (IDLE is restricted near the end of a loop, PGR 4-55; third from last in
+## a six-instruction loop is allowed.)
 LCNTR = 4, DO c UNTIL LCE;
+nop;
+nop;
+nop;
 idle;
+nop;
 c: nop;
-# CHECK: DO (PC, 2) UNTIL LCE;
+# CHECK: DO (PC, 6) UNTIL LCE;
 
 ## A branch more than eleven instructions before the end does not count.
 LCNTR = 4, DO d UNTIL LCE;
@@ -37,6 +46,9 @@ outer: nop;
 # CHECK: DO (PC, 1) UNTIL LCE (F);
 
 LCNTR = 4, DO e UNTIL LCE (F);
-JUMP (PC, 1);
+JUMP (PC, 4);
+nop;
+nop;
+nop;
 e: nop;
-# CHECK: DO (PC, 2) UNTIL LCE (F);
+# CHECK: DO (PC, 5) UNTIL LCE (F);

@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SHARCChecker.h"
 #include "MCTargetDesc/SHARCMCTargetDesc.h"
 #include "MCTargetDesc/SHARCSyntax.h"
 #include "MCTargetDesc/SHARCTargetStreamer.h"
@@ -170,7 +171,10 @@ class SHARCAsmParser : public MCTargetAsmParser {
     unsigned Size = 0;          // instructions so far
     bool AtLast = false;        // the end label was just defined
     SmallVector<bool, 16> Flow; // instruction changes flow or idles
+    bool Counter = false;       // DO ... UNTIL LCE
+    SmallVector<SHARCChecker::LoopInst, 16> Insts;
   };
+  SHARCChecker Checker;
   SmallVector<Loop, 2> Loops;
 
   // Section modes. A code section holds VISA code if it has SHF_SHARC_VISA,
@@ -194,6 +198,7 @@ public:
       : MCTargetAsmParser(STI, MII),
         MRI(*Parser.getContext().getRegisterInfo()),
         AsmInfo(Parser.getContext().getAsmInfo()),
+        Checker(Parser, MII),
         DefaultVISA(STI.hasFeature(SHARC::FeatureVISASection)) {
     buildRegisterNames();
     for (unsigned Opc = 0; Opc < MII.getNumOpcodes(); ++Opc) {
@@ -235,6 +240,7 @@ public:
         L.AtLast = true;
   }
   void onEndOfFile() override {
+    Checker.finish();
     for (const Loop &L : Loops)
       Error(L.Loc, "hardware loop end '" + L.End->getName() +
                        "' is not defined in this section");
@@ -1003,6 +1009,7 @@ bool SHARCAsmParser::parseInstruction(ParseInstructionInfo &Info,
       Sec->setFlags(Sec->getFlags() | ELF::SHF_SHARC_VISA);
   }
   if (MCInst *I = matchStatement()) {
+    Checker.check(*I, NameLoc, getSTI(), Out().getCurrentSectionOnly());
     trackLoops(*I, getSTI().hasFeature(SHARC::FeatureVISASection), NameLoc);
     Parsed = *I;
     return false;
@@ -1051,6 +1058,7 @@ void SHARCAsmParser::trackLoops(MCInst &I, bool VISA, SMLoc Loc) {
           MCConstantExpr::create(L.Size, Ctx), Ctx, Loc));
     ++L.Size;
     L.Flow.push_back(changesFlow(Name));
+    L.Insts.push_back({Loc, &I});
   }
 
   // A 48-bit alternative for a narrow instruction that may have to grow:
@@ -1074,6 +1082,7 @@ void SHARCAsmParser::trackLoops(MCInst &I, bool VISA, SMLoc Loc) {
   // end is a change of flow in the loops around it.
   while (!Loops.empty() && Loops.back().AtLast) {
     Loop L = Loops.pop_back_val();
+    Checker.checkLoop(L.Insts, L.Counter);
     Out().emitAssignment(L.Count, MCConstantExpr::create(L.Size, Ctx));
     if (L.Mode) {
       // F1-active, (F), is safe without a branch or IDLE in the last eleven
@@ -1099,6 +1108,7 @@ void SHARCAsmParser::trackLoops(MCInst &I, bool VISA, SMLoc Loc) {
   L.End = const_cast<MCSymbol *>(&Ref->getSymbol());
   L.Count = Ctx.createTempSymbol("sharc_loop_size", true);
   L.Loc = Ref->getLoc();
+  L.Counter = Name.starts_with("T12a");
   // On SHARC+, infer the mode of a counter loop written without (F).
   MCOperand &Mode = I.getOperand(findOperand(I.getOpcode(), "mode")->Index);
   if (Name.starts_with("T12a") && getSTI().hasFeature(SHARC::FeatureSHARCPlus) &&

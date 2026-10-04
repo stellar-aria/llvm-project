@@ -191,6 +191,28 @@ A PC-relative jump to a label in VISA code starts as a 32-bit Type 9b with
 a 6-bit offset and becomes the 48-bit Type 8a when the label is out of
 range or in another section.
 
+Diagnostics
+===========
+
+The assembler reports as errors the instruction sequences the manuals say
+development tools should reject:
+
+* in the two instructions after a delayed branch: a jump, call or return
+  (unless its condition is the opposite of the branch's), a PC stack push
+  or pop, a write to ``PCSTK`` or ``PCSTKP``, or ``IDLE`` (PGR 4-22, 4-23);
+* in a loop written with a label: ``JUMP`` or ``CALL`` in the last three
+  instructions; ``IDLE`` or ``EMUIDLE`` anywhere in a counter loop of one to
+  three instructions, as the last of four, or as the fifth from last of a
+  longer one, or in the last three of an arithmetic loop; a load of
+  ``CURLCNTR`` as the fifth from last of a counter loop (PGR 4-55);
+* ``IF NOT LCE`` right after a write to ``CURLCNTR`` (PGR 4-55);
+* a dual move loading one register on both buses (PRM 7-28).
+
+``-sharc-predictor-warnings`` adds warnings for the SHARC+ branch predictor
+guidance (PRM 4-12): fewer than twelve 48-bit instructions' worth of code
+after a branch in its section, and two branches in one 48-bit window of
+VISA code.
+
 Manual errata
 =============
 

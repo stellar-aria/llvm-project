@@ -24,10 +24,12 @@ IF AV JUMP(PC,0x00A4)(LA);
 # PGR 9-32
 JUMP (PC,2)(DB,CI);
 # CHECK: encoding: [0x3e,0x07,0x00,0x05,0x02,0x00]
+nop; nop;  // the two delay slots
 
 # PGR 9-35 Type 9 example
 IF EQ CALL(PC,17)(DB), ELSE R6=R6-1;
 # CHECK: encoding: [0x80,0x09,0x02,0x8e,0x60,0xa6]
+nop; nop;  // the two delay slots
 
 # PGR 9-40 Type 10 example, with the 6-bit offset written as -32 (the manual writes 0x20)
 IF NE JUMP(PC,-32), ELSE F12=FLOAT R10 BY R3, R6=DM(I5,M0);
@@ -36,6 +38,7 @@ IF NE JUMP(PC,-32), ELSE F12=FLOAT R10 BY R3, R6=DM(I5,M0);
 # Type 11
 RTS(DB);
 # CHECK: encoding: [0x3e,0x0a,0x00,0x04,0x00,0x00]
+nop; nop;  // the two delay slots
 
 # Type 12, numeric PC-relative end
 LCNTR=10, DO(PC,5)UNTIL LCE;

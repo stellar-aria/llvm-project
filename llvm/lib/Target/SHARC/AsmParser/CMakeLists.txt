@@ -1,5 +1,6 @@
 add_llvm_component_library(LLVMSHARCAsmParser
   SHARCAsmParser.cpp
+  SHARCChecker.cpp
 
   LINK_COMPONENTS
   MC
