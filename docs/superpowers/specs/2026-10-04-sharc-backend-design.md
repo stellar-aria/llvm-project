@@ -96,7 +96,9 @@ Sources are cited as PGR/PRM page (physical PDF page).
 ### 4.1 Instruction model
 
 - **Form opcodes**, one per Type and variant (`T1a`, `T4b_BW`, `T8a_rel`, …),
-  are generated from `decode_table.json`. Their operands are the fixed fields;
+  are generated from `decode_table.json`. Forms marked undocumented there
+  (`Type*p_undoc*`, observed only in firmware) are excluded under the
+  clean-room rule. Their operands are the fixed fields;
   the compute slot is a nested `MCOperand::createInst`.
 - **Compute opcodes** are generated from `compute_table.json`. They have their
   own 23-bit encodings and decoder namespace. Short compute (Type 2c, 12-bit)
@@ -140,9 +142,12 @@ Sources are cited as PGR/PRM page (physical PDF page).
   against the PGR memory chapter. If it fails, the fallback is a
   per-output-section address unit recorded in a SHARC-specific program header
   or section attribute.
-- **Byte order in the file:** `ELFDATA2MSB`. Each 48-bit word and each 16-bit
-  parcel is stored most significant byte first. Little-endian byte-space data
-  on SHARC+ is handled in M2 (loader and linker script), not M1.
+- **Byte order in the file:** `ELFDATA2LSB`. An instruction is stored as
+  16-bit parcels, most significant parcel first, and each parcel is
+  little-endian. This matches the layout observed in real SHARC+ images
+  (digiemu `tools/sharcspec/sharc_decode.py`) and SHARC+ byte-space data
+  being little-endian. The layout of 32-bit data words in images is checked
+  in Task 1 of the M1 plan; M2 handles anything the loader has to adapt.
 - **Relocations** (our own numbering, documented in `SHARCUsage.rst`):
   - absolute: `R_SHARC_ADDR24_{NW,SW}`, `R_SHARC_ADDR32_{NW,SW,LW,BYTE}`,
     `R_SHARC_DATA32`
@@ -260,7 +265,9 @@ Sources are cited as PGR/PRM page (physical PDF page).
 - A vs C has zero unresolved discrepancies, and the errata appendix is
   written.
 - The encoding sweep shows three-way agreement.
-- The firmware corpus decodes 100% and round-trips byte-identically.
+- The firmware corpus decodes 100%, except words that digiemu classifies as
+  undocumented forms (counted and reported separately), and round-trips
+  byte-identically.
 - The 48-bit code addressing item (4.3) is resolved and documented in
   `SHARCUsage.rst`.
 
