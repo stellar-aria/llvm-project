@@ -952,6 +952,24 @@ git commit -m "[SHARC] Import generated instruction forms, compute table and slo
 
 ---
 
+### Revision (2026-10-04, during Task 7, approved by the user)
+
+The printer and parser use one shared syntax table instead of per-family C++:
+`SHARCFormSyntax.def` (hand-transcribed from the PRM's encode tables, with
+pages) replaces `SHARCFormSlots.def`, and the generator also emits
+`SHARCOperandInfo.def` (operand names, kinds, widths). The template language
+and engine are in `MCTargetDesc/SHARCSyntax.{h,cpp}`; the printer renders
+templates and the parser (Tasks 9-10) matches them. Where steps below say
+"slot", read "syntax row".
+
+The digiemu table changes during Task 6: one decoder namespace per kind
+(Form16/32/48, Compute24, ShortCompute16, ShiftImm24) with no `_V` copies;
+Type 10a is predicated on `!visa-section`.
+
+`~/GitHub/sharcsim` (MAME's ADSP-2106x disassembler and interpreter) is an
+additional independent oracle for classic 48-bit forms whose layout did not
+change after the 2106x (Task 16), and an execution oracle for M2.
+
 ### Task 7: ISA disassembler and printer
 
 **Files:**

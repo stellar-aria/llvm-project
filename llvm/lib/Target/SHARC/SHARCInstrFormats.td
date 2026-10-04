@@ -15,8 +15,6 @@ class SHARCInst<int width, dag outs, dag ins, string asm, list<dag> pat>
   let AsmString = asm;
   let Pattern = pat;
   let hasSideEffects = 1;
-  // The printer and parser read fields by name (SHARC::getNamedOperandIdx).
-  let UseNamedOperandTable = 1;
 }
 
 class SHARCInst48<dag o, dag i, string a, list<dag> p>

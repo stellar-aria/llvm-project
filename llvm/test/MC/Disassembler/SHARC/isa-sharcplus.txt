@@ -1,0 +1,84 @@
+# RUN: llvm-mc --disassemble -triple=sharc -mcpu=adsp-2156x %s | FileCheck %s
+# RUN: llvm-mc --disassemble -triple=sharc -mcpu=adsp-2137x %s 2>&1 | FileCheck %s --check-prefix=CLASSIC
+#
+# SHARC+ forms and fields in ISA code. Expected text is written from the PRM's
+# encode tables (page in each comment); there is no independent SHARC+
+# disassembler to compare with.
+
+# Type 3d, PRM 14-22 LD table w=1,l=0,ex=1
+# CHECK: R3 = DM(I1, M2) (EX);
+0xbe 0x52 0xb6 0x01 0x00 0x00
+
+# Type 3d ST table w=0,l=1,ex=1, DAG2
+# CHECK-NEXT: PM(I9, M10) = R3 (SW, EX);
+0xbf 0x52 0xb4 0xc1 0x00 0x00
+
+# Type 3d LD table w=0,l=0,x=1,ex=1, pre-modify, IF EQ
+# CHECK-NEXT: IF EQ R3 = DM(M2, I1) (BWSE, EX);
+0x80 0x42 0xb5 0x01 0x00 0x00
+
+# Type 3d w=1,l=1: (LW, EX)
+# CHECK-NEXT: DM(I1, M2) = R3 (LW, EX);
+0xbe 0x52 0xb6 0xc1 0x00 0x00
+
+# Type 4d, PRM 14-32 BHSE table l=1,x=1
+# CHECK-NEXT: R5 = DM(I2, 4) (SWSE);
+0x7e 0x64 0xb5 0x22 0x00 0x00
+
+# Type 4d BH table l=0, pre-modify, store
+# CHECK-NEXT: PM(-1, I11) = R5 (BW);
+0xbf 0x67 0xb0 0xfa 0x00 0x00
+
+# Type 7d, PRM 14-50 ACONV breg=0,toby=1
+# CHECK-NEXT: I1 = W2B(I1);
+0xbe 0x04 0x80 0x48 0x00 0x00
+
+# Type 7d ACONV breg=1,toby=0, DAG2, destination is xor idis
+# CHECK-NEXT: B11 = B2W(B10);
+0xfe 0x04 0x80 0x91 0x00 0x00
+
+# Type 14d, PRM 16-4: w=1,ex=1,l=0 load
+# CHECK-NEXT: R4 = DM(0x1000) (EX);
+0xa4 0x1a 0x00 0x00 0x00 0x10
+
+# Type 14d: w=0,ex=0,l=1 store
+# CHECK-NEXT: DM(0x2000) = R4 (SW);
+0x44 0x1b 0x00 0x00 0x00 0x20
+
+# Type 26a, PRM 17-19
+# CHECK-NEXT: SYNC;
+0x40 0x00 0x00 0x00 0x00 0x00
+
+# Type 12a, PRM 15-23: mode=1 is (F)
+# CHECK-NEXT: LCNTR = 10, DO (PC, 5) UNTIL LCE (F);
+0x00 0x0c 0x80 0x0a 0x05 0x00
+
+# Type 12a: the SHARC+ offset is 23 bits
+# CHECK-NEXT: LCNTR = 3, DO (PC, -2) UNTIL LCE;
+0x00 0x0c 0x7f 0x03 0xfe 0xff
+
+# Type 13a with (F)
+# CHECK-NEXT: DO (PC, 7) UNTIL NOT FLAG2_IN (F);
+0x36 0x0e 0x80 0x00 0x07 0x00
+
+# Type 17a, Ureg 0x7D is MODE1STK on SHARC+ (PRM p551)
+# CHECK-NEXT: MODE1STK = 0x1;
+0x7d 0x0f 0x00 0x00 0x01 0x00
+
+# Type 20a cache operations, PRM 17-7
+# CHECK-NEXT: INVALIDATE I_CACHE, FLUSH DM_CACHE, WRITEBACK PM_CACHE;
+0x00 0x17 0x00 0xf0 0x00 0x00
+
+# Type 7a with the SHARC+ size option, PRM 14-46 BH table w=1
+# CHECK-NEXT: I7 = MODIFY(I1, M3) (NW);
+0xbe 0x04 0x00 0x5e 0x00 0x00
+
+# Condition 14 is SF on SHARC+ (PGR Table 10-4 note)
+# CHECK-NEXT: IF SF R3 = R5 + R9;
+0x1c 0x01 0x00 0x00 0x59 0x13
+
+# On a classic core the SHARC+-only forms do not decode, Ureg 0x7D is
+# LIRPTL, and condition 14 is BM.
+# CLASSIC: warning: invalid instruction encoding
+# CLASSIC: LIRPTL = 0x1;
+# CLASSIC: IF BM R3 = R5 + R9;

@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SHARCMCTargetDesc.h"
+#include "SHARCInstPrinter.h"
 #include "SHARCMCAsmInfo.h"
 #include "TargetInfo/SHARCTargetInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
@@ -52,6 +53,14 @@ createSHARCMCSubtargetInfo(const Triple &TT, StringRef CPU, StringRef FS) {
   return createSHARCMCSubtargetInfoImpl(TT, CPU, /*TuneCPU=*/CPU, FS);
 }
 
+static MCInstPrinter *createSHARCMCInstPrinter(const Triple &T,
+                                               unsigned SyntaxVariant,
+                                               const MCAsmInfo &MAI,
+                                               const MCInstrInfo &MII,
+                                               const MCRegisterInfo &MRI) {
+  return new SHARCInstPrinter(MAI, MII, MRI);
+}
+
 extern "C" LLVM_EXTERNAL_VISIBILITY void
 LLVMInitializeSHARCTargetMC() {
   Target &T = getTheSHARCTarget();
@@ -59,4 +68,5 @@ LLVMInitializeSHARCTargetMC() {
   TargetRegistry::RegisterMCInstrInfo(T, createSHARCMCInstrInfo);
   TargetRegistry::RegisterMCRegInfo(T, createSHARCMCRegisterInfo);
   TargetRegistry::RegisterMCSubtargetInfo(T, createSHARCMCSubtargetInfo);
+  TargetRegistry::RegisterMCInstPrinter(T, createSHARCMCInstPrinter);
 }

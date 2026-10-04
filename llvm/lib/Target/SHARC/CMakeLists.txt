@@ -2,6 +2,7 @@ add_llvm_component_group(SHARC)
 
 set(LLVM_TARGET_DEFINITIONS SHARC.td)
 
+tablegen(LLVM SHARCGenDisassemblerTables.inc -gen-disassembler)
 tablegen(LLVM SHARCGenInstrInfo.inc -gen-instr-info)
 tablegen(LLVM SHARCGenRegisterInfo.inc -gen-register-info)
 tablegen(LLVM SHARCGenSubtargetInfo.inc -gen-subtarget)
@@ -25,5 +26,6 @@ add_llvm_target(SHARCCodeGen
   SHARC
   )
 
+add_subdirectory(Disassembler)
 add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)

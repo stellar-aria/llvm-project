@@ -7,10 +7,10 @@
 # RUN:   print(len(set(re.sub(r'_V$', '', x) for x in n)))" %t.json | FileCheck %s
 # CHECK: {{^}}55{{$}}
 
-## Every form has exactly one syntax family in SHARCFormSlots.def.
+## Every form has at least one top-level syntax row in SHARCFormSyntax.def.
 # RUN: %python -c "import json,re,sys; d=json.load(open(sys.argv[1])); \
 # RUN:   forms=sorted(k for k in d['!instanceof']['Instruction'] if re.match(r'T[0-9]', k)); \
-# RUN:   rows=re.findall(r'^SHARC_FORM_KIND\((\w+),', open(sys.argv[2]).read(), re.M); \
-# RUN:   print('slots', 'ok' if sorted(rows) == forms else sorted(set(forms) ^ set(rows)))" \
-# RUN:   %t.json %p/../../../lib/Target/SHARC/SHARCFormSlots.def | FileCheck %s --check-prefix=SLOTS
-# SLOTS: slots ok
+# RUN:   rows=set(re.findall(r'^SHARC_SYNTAX\((\w+),', open(sys.argv[2]).read(), re.M)); \
+# RUN:   print('syntax', 'ok' if rows == set(forms) else sorted(set(forms) ^ rows))" \
+# RUN:   %t.json %p/../../../lib/Target/SHARC/SHARCFormSyntax.def | FileCheck %s --check-prefix=SYNTAX
+# SYNTAX: syntax ok

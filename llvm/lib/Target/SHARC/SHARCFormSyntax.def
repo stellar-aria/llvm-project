@@ -1,0 +1,373 @@
+//===-- SHARCFormSyntax.def - Assembly syntax of each form ------*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// The syntax of each instruction form, transcribed from the encode and
+// syntax tables of the SHARC+ Core Programming Reference (PRM, page in each
+// comment) and checked against the classic SHARC Programming Reference.
+// The template language is described in MCTargetDesc/SHARCSyntax.h.
+//
+//   SHARC_SYNTAX(Form, Conds, Template)       a top-level alternative
+//   SHARC_PART(Form, Part, Conds, Template)   a %Part fragment of one form
+//   SHARC_COMMON_PART(Part, Conds, Template)  a %Part fragment for all forms
+//
+// Rows are tried in order; the first whose conditions hold is used. A row
+// only matches if every field it neither tests nor prints is zero, so no
+// encoding bits are ever dropped silently.
+//
+// Field meanings (PGR Table 10-1): d=1 memory write; u=1 post-modify (I, M)
+// with update, u=0 pre-modify (M, I); g=1 DAG2; l=1 long word; b=1 CALL;
+// j=1 delayed (DB); a=1 loop abort (LA); ci=1 clear interrupt (CI);
+// e=1 ELSE; lr=1 loop reentry (LR).
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SHARC_SYNTAX
+#define SHARC_SYNTAX(FORM, CONDS, TEMPLATE)
+#endif
+#ifndef SHARC_PART
+#define SHARC_PART(FORM, PART, CONDS, TEMPLATE)
+#endif
+#ifndef SHARC_COMMON_PART
+#define SHARC_COMMON_PART(PART, CONDS, TEMPLATE)
+#endif
+
+//===----------------------------------------------------------------------===//
+// Fragments shared by several forms
+//===----------------------------------------------------------------------===//
+
+// DAG memory addressing: post-modify (I, M) with update, pre-modify (M, I);
+// g selects DM with DAG1 or PM with DAG2 (PRM 14-12 ACCESS table).
+SHARC_COMMON_PART(MEMPOST, "g=0", "DM($I(g,i), $M(g,m))")
+SHARC_COMMON_PART(MEMPOST, "g=1", "PM($I(g,i), $M(g,m))")
+SHARC_COMMON_PART(MEMPRE, "g=0", "DM($M(g,m), $I(g,i))")
+SHARC_COMMON_PART(MEMPRE, "g=1", "PM($M(g,m), $I(g,i))")
+// 6-bit immediate modifier (PRM 14-26 ACCESS table).
+SHARC_COMMON_PART(IMMPOST, "g=0", "DM($I(g,i), $data:s)")
+SHARC_COMMON_PART(IMMPOST, "g=1", "PM($I(g,i), $data:s)")
+SHARC_COMMON_PART(IMMPRE, "g=0", "DM($data:s, $I(g,i))")
+SHARC_COMMON_PART(IMMPRE, "g=1", "PM($data:s, $I(g,i))")
+SHARC_COMMON_PART(LW, "l=0", "")
+SHARC_COMMON_PART(LW, "l=1", " (LW)")
+
+// Branches: b selects CALL, j (DB), a (LA), ci (CI); only these
+// combinations are listed (PRM 15-2 JUMP table, 15-5 JUMPCLAUSE table).
+// %TGT is the form's own target syntax.
+SHARC_COMMON_PART(BRANCH, "b=0,a=0,j=0,ci=0", "JUMP %TGT")
+SHARC_COMMON_PART(BRANCH, "b=0,a=0,j=0,ci=1", "JUMP %TGT (CI)")
+SHARC_COMMON_PART(BRANCH, "b=0,a=0,j=1,ci=0", "JUMP %TGT (DB)")
+SHARC_COMMON_PART(BRANCH, "b=0,a=0,j=1,ci=1", "JUMP %TGT (DB, CI)")
+SHARC_COMMON_PART(BRANCH, "b=0,a=1,j=0,ci=0", "JUMP %TGT (LA)")
+SHARC_COMMON_PART(BRANCH, "b=0,a=1,j=1,ci=0", "JUMP %TGT (DB, LA)")
+SHARC_COMMON_PART(BRANCH, "b=1,a=0,j=0,ci=0", "CALL %TGT")
+SHARC_COMMON_PART(BRANCH, "b=1,a=0,j=1,ci=0", "CALL %TGT (DB)")
+// Optional compute or ELSE compute after a branch or return (PRM 15-5
+// COMPUTECLAUSE table).
+SHARC_COMMON_PART(CC, "e=0", "[, $compute]")
+SHARC_COMMON_PART(CC, "e=1", ", ELSE $compute")
+// Returns: x selects RTI (PRM 15-16 RETURN table).
+SHARC_COMMON_PART(RET, "x=0,j=0,lr=0", "RTS")
+SHARC_COMMON_PART(RET, "x=0,j=0,lr=1", "RTS (LR)")
+SHARC_COMMON_PART(RET, "x=0,j=1,lr=0", "RTS (DB)")
+SHARC_COMMON_PART(RET, "x=0,j=1,lr=1", "RTS (DB, LR)")
+SHARC_COMMON_PART(RET, "x=1,j=0,lr=0", "RTI")
+SHARC_COMMON_PART(RET, "x=1,j=1,lr=0", "RTI (DB)")
+// Modify size option of SHARC+ index modify (PRM 14-46 BH table).
+SHARC_COMMON_PART(NWSW, "w=0,l=0", "")
+SHARC_COMMON_PART(NWSW, "+sharcplus,w=0,l=1", " (SW)")
+SHARC_COMMON_PART(NWSW, "+sharcplus,w=1,l=0", " (NW)")
+
+//===----------------------------------------------------------------------===//
+// Group I: conditional compute and move or modify (PRM ch. 14)
+//===----------------------------------------------------------------------===//
+
+// Type 1a/1b: compute + dual DM/PM moves (PRM 14-3, 14-6).
+SHARC_COMMON_PART(DUALDM, "dmd=0", "$dmdreg = DM($dmi, $dmm)")
+SHARC_COMMON_PART(DUALDM, "dmd=1", "DM($dmi, $dmm) = $dmdreg")
+SHARC_COMMON_PART(DUALPM, "pmd=0", "$pmdreg = PM($pmi, $pmm)")
+SHARC_COMMON_PART(DUALPM, "pmd=1", "PM($pmi, $pmm) = $pmdreg")
+SHARC_SYNTAX(T1a, "", "[$compute, ]%DUALDM, %DUALPM")
+SHARC_SYNTAX(T1b, "", "%DUALDM, %DUALPM")
+
+// Type 2a/2b/2c: conditional compute, compute, short compute (PRM 14-8..11).
+SHARC_SYNTAX(T2a, "", "[IF $cond ]$compute")
+SHARC_SYNTAX(T2b, "", "$compute")
+SHARC_SYNTAX(T2c, "", "$compute")
+
+// Type 3a: Ureg <-> memory with optional compute (PRM 14-12).
+SHARC_PART(T3a, ACC, "u=1,d=0", "$ureg = %MEMPOST%LW")
+SHARC_PART(T3a, ACC, "u=1,d=1", "%MEMPOST = $ureg%LW")
+SHARC_PART(T3a, ACC, "u=0,d=0", "$ureg = %MEMPRE%LW")
+SHARC_PART(T3a, ACC, "u=0,d=1", "%MEMPRE = $ureg%LW")
+SHARC_SYNTAX(T3a, "", "[IF $cond ][$compute, ]%ACC")
+
+// Type 3b: Ureg <-> memory (PRM 14-16). l/x/w = 0/1/1 is a plain access;
+// SHARC+ adds byte and short word sizes. (LW) with l/x/w = 1/1/1 is from
+// the PGR (9-12); the PRM's BH table does not list it.
+SHARC_PART(T3b, ACC, "u=1,d=0", "$ureg = %MEMPOST%BHSE")
+SHARC_PART(T3b, ACC, "u=1,d=1", "%MEMPOST = $ureg%BH")
+SHARC_PART(T3b, ACC, "u=0,d=0", "$ureg = %MEMPRE%BHSE")
+SHARC_PART(T3b, ACC, "u=0,d=1", "%MEMPRE = $ureg%BH")
+SHARC_PART(T3b, BH, "l=0,x=1,w=1", "")
+SHARC_PART(T3b, BH, "l=1,x=1,w=1", " (LW)")
+SHARC_PART(T3b, BH, "+byte-addr,l=0,x=0,w=0", " (BW)")
+SHARC_PART(T3b, BH, "+byte-addr,l=1,x=0,w=0", " (SW)")
+SHARC_PART(T3b, BHSE, "l=0,x=1,w=1", "")
+SHARC_PART(T3b, BHSE, "l=1,x=1,w=1", " (LW)")
+SHARC_PART(T3b, BHSE, "+byte-addr,l=0,x=0,w=0", " (BW)")
+SHARC_PART(T3b, BHSE, "+byte-addr,l=0,x=1,w=0", " (BWSE)")
+SHARC_PART(T3b, BHSE, "+byte-addr,l=1,x=0,w=0", " (SW)")
+SHARC_SYNTAX(T3b, "", "[IF $cond ]%ACC")
+
+// Type 3c: Dreg <-> DM, 16-bit (PRM 14-20).
+SHARC_SYNTAX(T3c, "d=0", "$dreg = DM($dmi, $dmm)")
+SHARC_SYNTAX(T3c, "d=1", "DM($dmi, $dmm) = $dreg")
+
+// Type 3d: exclusive Ureg <-> memory, SHARC+ (PRM 14-22). w=0 is a byte or
+// short word access, w=1 a word (or long word) access.
+SHARC_PART(T3d, ACC, "u=1,d=0", "$ureg = %MEMPOST%LD")
+SHARC_PART(T3d, ACC, "u=1,d=1", "%MEMPOST = $ureg%ST")
+SHARC_PART(T3d, ACC, "u=0,d=0", "$ureg = %MEMPRE%LD")
+SHARC_PART(T3d, ACC, "u=0,d=1", "%MEMPRE = $ureg%ST")
+SHARC_PART(T3d, ST, "w=0,l=0,ex=1", " (BW, EX)")
+SHARC_PART(T3d, ST, "w=0,l=1,ex=1", " (SW, EX)")
+SHARC_PART(T3d, ST, "w=1,l=0,ex=1", " (EX)")
+SHARC_PART(T3d, ST, "w=1,l=1,ex=1", " (LW, EX)")
+SHARC_PART(T3d, LD, "w=0,l=0,x=0,ex=1", " (BW, EX)")
+SHARC_PART(T3d, LD, "w=0,l=1,x=0,ex=1", " (SW, EX)")
+SHARC_PART(T3d, LD, "w=0,l=0,x=1,ex=1", " (BWSE, EX)")
+SHARC_PART(T3d, LD, "w=0,l=1,x=1,ex=1", " (SWSE, EX)")
+SHARC_PART(T3d, LD, "w=1,l=0,ex=1", " (EX)")
+SHARC_PART(T3d, LD, "w=1,l=1,ex=1", " (LW, EX)")
+SHARC_SYNTAX(T3d, "", "[IF $cond ]%ACC")
+
+// Type 4a: Dreg <-> memory with 6-bit immediate modifier (PRM 14-26).
+SHARC_PART(T4a, ACC, "u=1,d=0", "$dreg = %IMMPOST")
+SHARC_PART(T4a, ACC, "u=1,d=1", "%IMMPOST = $dreg")
+SHARC_PART(T4a, ACC, "u=0,d=0", "$dreg = %IMMPRE")
+SHARC_PART(T4a, ACC, "u=0,d=1", "%IMMPRE = $dreg")
+SHARC_SYNTAX(T4a, "", "[IF $cond ][$compute, ]%ACC")
+
+// Type 4b (PRM 14-29). Here l/x/w = 1/1/1 is the plain access.
+SHARC_PART(T4b, ACC, "u=1,d=0", "$dreg = %IMMPOST%BHSE")
+SHARC_PART(T4b, ACC, "u=1,d=1", "%IMMPOST = $dreg%BH")
+SHARC_PART(T4b, ACC, "u=0,d=0", "$dreg = %IMMPRE%BHSE")
+SHARC_PART(T4b, ACC, "u=0,d=1", "%IMMPRE = $dreg%BH")
+SHARC_PART(T4b, BH, "l=1,x=1,w=1", "")
+SHARC_PART(T4b, BH, "+byte-addr,l=0,x=0,w=0", " (BW)")
+SHARC_PART(T4b, BH, "+byte-addr,l=1,x=0,w=0", " (SW)")
+SHARC_PART(T4b, BHSE, "l=1,x=1,w=1", "")
+SHARC_PART(T4b, BHSE, "+byte-addr,l=0,x=0,w=0", " (BW)")
+SHARC_PART(T4b, BHSE, "+byte-addr,l=1,x=0,w=0", " (SW)")
+SHARC_PART(T4b, BHSE, "+byte-addr,l=0,x=1,w=0", " (BWSE)")
+SHARC_PART(T4b, BHSE, "+byte-addr,l=1,x=1,w=0", " (SWSE)")
+SHARC_SYNTAX(T4b, "", "[IF $cond ]%ACC")
+
+// Type 4d: byte/short word access with 6-bit modifier, SHARC+ (PRM 14-32).
+SHARC_PART(T4d, ACC, "u=1,d=0", "$dreg = %IMMPOST%BHSE")
+SHARC_PART(T4d, ACC, "u=1,d=1", "%IMMPOST = $dreg%BH")
+SHARC_PART(T4d, ACC, "u=0,d=0", "$dreg = %IMMPRE%BHSE")
+SHARC_PART(T4d, ACC, "u=0,d=1", "%IMMPRE = $dreg%BH")
+SHARC_PART(T4d, BH, "l=0", " (BW)")
+SHARC_PART(T4d, BH, "l=1", " (SW)")
+SHARC_PART(T4d, BHSE, "l=0,x=0", " (BW)")
+SHARC_PART(T4d, BHSE, "l=1,x=0", " (SW)")
+SHARC_PART(T4d, BHSE, "l=0,x=1", " (BWSE)")
+SHARC_PART(T4d, BHSE, "l=1,x=1", " (SWSE)")
+SHARC_SYNTAX(T4d, "", "[IF $cond ]%ACC")
+
+// Type 5a/5b: register move and swap (PRM 14-35..40).
+SHARC_SYNTAX(T5a_move, "", "[IF $cond ][$compute, ]$dstureg = $srcureg")
+SHARC_SYNTAX(T5a_swap, "", "[IF $cond ][$compute, ]$dreg <-> $cdreg")
+SHARC_SYNTAX(T5b_move, "", "[IF $cond ]$dstureg = $srcureg")
+SHARC_SYNTAX(T5b_swap, "", "[IF $cond ]$dreg <-> $cdreg")
+
+// Type 6a: shift immediate with optional memory move (PRM 14-42, 14-44).
+SHARC_PART(T6a_mem, ACC, "d=0", "$dreg = %MEMPOST")
+SHARC_PART(T6a_mem, ACC, "d=1", "%MEMPOST = $dreg")
+SHARC_SYNTAX(T6a_mem, "", "[IF $cond ]$shiftimm, %ACC")
+SHARC_SYNTAX(T6a_nomem, "", "[IF $cond ]$shiftimm")
+
+// Type 7a/7b: index modify (PRM 14-46, 14-49). The destination index
+// register is Is xor idis (PGR Table 10-1, "Id + Is").
+SHARC_PART(T7a, MOD, "idis=0,w=0,l=0", "MODIFY($I(g,is), $M(g,m))")
+SHARC_PART(T7a, MOD, "", "$Ix(g,is,idis) = MODIFY($I(g,is), $M(g,m))%NWSW")
+SHARC_SYNTAX(T7a, "", "[IF $cond ][$compute, ]%MOD")
+SHARC_PART(T7b, MOD, "idis=0,w=0,l=0", "MODIFY($I(g,is), $M(g,m))")
+SHARC_PART(T7b, MOD, "", "$Ix(g,is,idis) = MODIFY($I(g,is), $M(g,m))%NWSW")
+SHARC_SYNTAX(T7b, "", "[IF $cond ]%MOD")
+
+// Type 7d: byte/word pointer conversion, SHARC+ (PRM 14-50).
+SHARC_PART(T7d, ACONV, "breg=0,toby=0", "$Ix(g,is,idis) = B2W($I(g,is))")
+SHARC_PART(T7d, ACONV, "breg=0,toby=1", "$Ix(g,is,idis) = W2B($I(g,is))")
+SHARC_PART(T7d, ACONV, "breg=1,toby=0", "$Bx(g,is,idis) = B2W($B(g,is))")
+SHARC_PART(T7d, ACONV, "breg=1,toby=1", "$Bx(g,is,idis) = W2B($B(g,is))")
+SHARC_SYNTAX(T7d, "", "[IF $cond ][$compute, ]%ACONV")
+
+//===----------------------------------------------------------------------===//
+// Group II: program flow control (PRM ch. 15)
+//===----------------------------------------------------------------------===//
+
+// Type 8a: direct jump or call (PRM 15-2).
+SHARC_PART(T8a_abs, TGT, "", "$addr")
+SHARC_SYNTAX(T8a_abs, "", "[IF $cond ]%BRANCH")
+SHARC_PART(T8a_rel, TGT, "", "(PC, $reladdr)")
+SHARC_SYNTAX(T8a_rel, "", "[IF $cond ]%BRANCH")
+
+// Type 9a/9b: indirect or short relative jump or call, with compute or ELSE
+// compute (PRM 15-5, 15-9). The target is written (Md, Ic).
+SHARC_PART(T9a_abs, TGT, "", "($pmm, $pmi)")
+SHARC_SYNTAX(T9a_abs, "", "[IF $cond ]%BRANCH%CC")
+SHARC_PART(T9a_rel, TGT, "", "(PC, $reladdr)")
+SHARC_SYNTAX(T9a_rel, "", "[IF $cond ]%BRANCH%CC")
+SHARC_PART(T9b_abs, TGT, "", "($pmm, $pmi)")
+SHARC_SYNTAX(T9b_abs, "", "[IF $cond ]%BRANCH")
+SHARC_PART(T9b_rel, TGT, "", "(PC, $reladdr)")
+SHARC_SYNTAX(T9b_rel, "", "[IF $cond ]%BRANCH")
+
+// Type 10a: jump, ELSE compute and DM move; ISA only (PRM 15-13).
+SHARC_PART(T10a_abs, ACC, "d=0", "$dreg = DM($dmi, $dmm)")
+SHARC_PART(T10a_abs, ACC, "d=1", "DM($dmi, $dmm) = $dreg")
+SHARC_SYNTAX(T10a_abs, "", "[IF $cond ]JUMP ($pmm, $pmi), ELSE [$compute, ]%ACC")
+SHARC_PART(T10a_rel, ACC, "d=0", "$dreg = DM($dmi, $dmm)")
+SHARC_PART(T10a_rel, ACC, "d=1", "DM($dmi, $dmm) = $dreg")
+SHARC_SYNTAX(T10a_rel, "", "[IF $cond ]JUMP (PC, $reladdr), ELSE [$compute, ]%ACC")
+
+// Type 11a/11c: return (PRM 15-16, 15-20).
+SHARC_SYNTAX(T11a, "", "[IF $cond ]%RET%CC")
+SHARC_SYNTAX(T11c, "", "[IF $cond ]%RET")
+
+// Type 12a/13a: hardware loops (PRM 15-23..25). On SHARC+ bit 23 selects
+// the loop mode (F) and the offset is 23 bits (PRM p378); on classic cores
+// the offset is 24 bits and bit 23 is its sign.
+SHARC_SYNTAX(T12a_imm, "+sharcplus,mode=0", "LCNTR = $data:d, DO (PC, $reladdr) UNTIL LCE")
+SHARC_SYNTAX(T12a_imm, "+sharcplus,mode=1", "LCNTR = $data:d, DO (PC, $reladdr) UNTIL LCE (F)")
+SHARC_SYNTAX(T12a_imm, "-sharcplus", "LCNTR = $data:d, DO (PC, $cat(mode,reladdr)) UNTIL LCE")
+SHARC_SYNTAX(T12a_ureg, "+sharcplus,mode=0", "LCNTR = $ureg, DO (PC, $reladdr) UNTIL LCE")
+SHARC_SYNTAX(T12a_ureg, "+sharcplus,mode=1", "LCNTR = $ureg, DO (PC, $reladdr) UNTIL LCE (F)")
+SHARC_SYNTAX(T12a_ureg, "-sharcplus", "LCNTR = $ureg, DO (PC, $cat(mode,reladdr)) UNTIL LCE")
+SHARC_SYNTAX(T13a, "+sharcplus,mode=0", "DO (PC, $reladdr) UNTIL $term")
+SHARC_SYNTAX(T13a, "+sharcplus,mode=1", "DO (PC, $reladdr) UNTIL $term (F)")
+SHARC_SYNTAX(T13a, "-sharcplus", "DO (PC, $cat(mode,reladdr)) UNTIL $term")
+
+//===----------------------------------------------------------------------===//
+// Group III: immediate data moves (PRM ch. 16)
+//===----------------------------------------------------------------------===//
+
+// Type 14a: Ureg <-> memory at an absolute address (PRM 16-2).
+SHARC_COMMON_PART(ABS, "g=0", "DM($addr)")
+SHARC_COMMON_PART(ABS, "g=1", "PM($addr)")
+SHARC_SYNTAX(T14a, "d=0", "$ureg = %ABS%LW")
+SHARC_SYNTAX(T14a, "d=1", "%ABS = $ureg%LW")
+
+// Type 14d: exclusive or byte access at an absolute address, SHARC+
+// (PRM 16-4).
+SHARC_SYNTAX(T14d, "d=0", "$dreg = DM($addr)%LD")
+SHARC_SYNTAX(T14d, "d=1", "DM($addr) = $dreg%ST")
+SHARC_PART(T14d, ST, "w=1,ex=1,l=0", " (EX)")
+SHARC_PART(T14d, ST, "w=1,ex=1,l=1", " (LW, EX)")
+SHARC_PART(T14d, ST, "w=0,ex=1,l=0", " (BW, EX)")
+SHARC_PART(T14d, ST, "w=0,ex=1,l=1", " (SW, EX)")
+SHARC_PART(T14d, ST, "w=0,ex=0,l=0", " (BW)")
+SHARC_PART(T14d, ST, "w=0,ex=0,l=1", " (SW)")
+SHARC_PART(T14d, LD, "w=1,ex=1,l=0", " (EX)")
+SHARC_PART(T14d, LD, "w=1,ex=1,l=1", " (LW, EX)")
+SHARC_PART(T14d, LD, "w=0,ex=1,l=0,x=0", " (BW, EX)")
+SHARC_PART(T14d, LD, "w=0,ex=1,l=1,x=0", " (SW, EX)")
+SHARC_PART(T14d, LD, "w=0,ex=1,l=0,x=1", " (BWSE, EX)")
+SHARC_PART(T14d, LD, "w=0,ex=1,l=1,x=1", " (SWSE, EX)")
+SHARC_PART(T14d, LD, "w=0,ex=0,l=0,x=0", " (BW)")
+SHARC_PART(T14d, LD, "w=0,ex=0,l=1,x=0", " (SW)")
+SHARC_PART(T14d, LD, "w=0,ex=0,l=0,x=1", " (BWSE)")
+SHARC_PART(T14d, LD, "w=0,ex=0,l=1,x=1", " (SWSE)")
+
+// Type 15a/15b: Ureg <-> memory at I + immediate offset (PRM 16-7, 16-10).
+SHARC_PART(T15a, OFF, "g=0", "DM($addr, $I(g,i))")
+SHARC_PART(T15a, OFF, "g=1", "PM($addr, $I(g,i))")
+SHARC_SYNTAX(T15a, "d=0", "$ureg = %OFF%LW")
+SHARC_SYNTAX(T15a, "d=1", "%OFF = $ureg%LW")
+SHARC_PART(T15b, OFF, "g=0", "DM($data:s, $I(g,i))")
+SHARC_PART(T15b, OFF, "g=1", "PM($data:s, $I(g,i))")
+SHARC_SYNTAX(T15b, "d=0", "$ureg = %OFF%LW")
+SHARC_SYNTAX(T15b, "d=1", "%OFF = $ureg%LW")
+
+// Type 16a/16b: store an immediate (PRM 16-13, 16-14). The sl and by bits
+// of Type 16a are not described; only encodings with both clear print.
+SHARC_SYNTAX(T16a, "", "%MEMPOST = $data:x")
+SHARC_SYNTAX(T16b, "", "%MEMPOST = $data:x")
+
+// Type 17a/17b: Ureg = immediate (PRM 16-16, 16-17).
+SHARC_SYNTAX(T17a, "", "$ureg = $data:x")
+SHARC_SYNTAX(T17b, "", "$ureg = $data:x")
+
+//===----------------------------------------------------------------------===//
+// Group IV: miscellaneous (PRM ch. 17)
+//===----------------------------------------------------------------------===//
+
+// Type 18a: system register bit operation (PRM 17-2).
+SHARC_PART(T18a, BOP, "bop=0", "SET")
+SHARC_PART(T18a, BOP, "bop=1", "CLR")
+SHARC_PART(T18a, BOP, "bop=2", "TGL")
+SHARC_PART(T18a, BOP, "bop=4", "TST")
+SHARC_PART(T18a, BOP, "bop=5", "XOR")
+SHARC_SYNTAX(T18a, "", "BIT %BOP $sreg $data:x")
+
+// Type 19a: index modify or bit-reverse by an immediate (PRM 17-4, 17-6).
+// The SHARC+ sc and w fields of Type 19a are not in the encoding tables yet.
+SHARC_SYNTAX(T19a, "idis=0", "MODIFY($I(g,is), $data:s)")
+SHARC_SYNTAX(T19a, "", "$Ix(g,is,idis) = MODIFY($I(g,is), $data:s)")
+SHARC_SYNTAX(T19a_bitrev, "idis=0", "BITREV($I(g,is), $data:x)")
+SHARC_SYNTAX(T19a_bitrev, "", "$Ix(g,is,idis) = BITREV($I(g,is), $data:x)")
+
+// Type 20a: stack and cache operations, in the PRM's order (PRM 17-7).
+// The PRM's DMCACHE table gives l1di=l1dwb=1 as "writeback"; PMCACHE gives
+// "flush" for the same bits, which is used for both here.
+SHARC_PART(T20a, LOOP, "lpu=0,lpo=0", "")
+SHARC_PART(T20a, LOOP, "lpu=1,lpo=0", "PUSH LOOP")
+SHARC_PART(T20a, LOOP, "lpu=0,lpo=1", "POP LOOP")
+SHARC_PART(T20a, STS, "spu=0,spo=0", "")
+SHARC_PART(T20a, STS, "spu=1,spo=0", "PUSH STS")
+SHARC_PART(T20a, STS, "spu=0,spo=1", "POP STS")
+SHARC_PART(T20a, PCSTK, "ppu=0,ppo=0", "")
+SHARC_PART(T20a, PCSTK, "ppu=1,ppo=0", "PUSH PCSTK")
+SHARC_PART(T20a, PCSTK, "ppu=0,ppo=1", "POP PCSTK")
+SHARC_PART(T20a, FC, "fc=0", "")
+SHARC_PART(T20a, FC, "fc=1", "FLUSH CACHE")
+SHARC_PART(T20a, IC, "llii=0", "")
+SHARC_PART(T20a, IC, "+sharcplus,llii=1", "INVALIDATE I_CACHE")
+SHARC_PART(T20a, DMC, "lldi=0,lldwb=0", "")
+SHARC_PART(T20a, DMC, "+sharcplus,lldi=1,lldwb=0", "INVALIDATE DM_CACHE")
+SHARC_PART(T20a, DMC, "+sharcplus,lldi=0,lldwb=1", "WRITEBACK DM_CACHE")
+SHARC_PART(T20a, DMC, "+sharcplus,lldi=1,lldwb=1", "FLUSH DM_CACHE")
+SHARC_PART(T20a, PMC, "llpi=0,llpwb=0", "")
+SHARC_PART(T20a, PMC, "+sharcplus,llpi=1,llpwb=0", "INVALIDATE PM_CACHE")
+SHARC_PART(T20a, PMC, "+sharcplus,llpi=0,llpwb=1", "WRITEBACK PM_CACHE")
+SHARC_PART(T20a, PMC, "+sharcplus,llpi=1,llpwb=1", "FLUSH PM_CACHE")
+SHARC_SYNTAX(T20a, "", "{%LOOP, %STS, %PCSTK, %FC, %IC, %DMC, %PMC}")
+
+// Type 21a/21c: NOP (PRM 17-11, 17-12).
+SHARC_SYNTAX(T21a, "", "NOP")
+SHARC_SYNTAX(T21c, "", "NOP")
+
+// Type 22a/22c: IDLE / EMUIDLE (PRM 17-13, 17-14).
+SHARC_SYNTAX(T22a, "emu=0", "IDLE")
+SHARC_SYNTAX(T22a, "emu=1", "EMUIDLE")
+SHARC_SYNTAX(T22c, "emu=0", "IDLE")
+SHARC_SYNTAX(T22c, "emu=1", "EMUIDLE")
+
+// Type 25a/25c: compiler frame jump and return (PRM 17-15..18).
+SHARC_SYNTAX(T25a_direct, "", "CJUMP $addr (DB)")
+SHARC_SYNTAX(T25a_pcrel, "", "CJUMP (PC, $reladdr) (DB)")
+SHARC_SYNTAX(T25a_rframe, "", "RFRAME")
+SHARC_SYNTAX(T25c_rframe, "", "RFRAME")
+
+// Type 26a: SYNC, SHARC+ (PRM 17-19).
+SHARC_SYNTAX(T26a, "", "SYNC")
+
+#undef SHARC_SYNTAX
+#undef SHARC_PART
+#undef SHARC_COMMON_PART

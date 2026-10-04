@@ -130,3 +130,31 @@ Manual errata
      - 3/4
      - The PRM's own description of the operation (add the address to its
        left-shifted version, shift right by two) is 3/4, matching PGR p300.
+   * - PGR
+     - Table 10-2 (p473)
+     - Ureg code 0x7D is "LRPTL"
+     - LIRPTL
+     - Typographical error; the register is LIRPTL everywhere else.
+   * - PGR
+     - Table 10-1 (p18117 text, 10-2)
+     - EMU and IDL rows of Type 22a contradict each other
+     - emu = 1 is EMUIDLE
+     - PRM Type 22a table (17-13) is unambiguous.
+   * - PRM
+     - 14-16 (Type 3b BH table)
+     - No (LW) row
+     - l/x/w = 1/1/1 is (LW)
+     - The PGR's Type 3b syntax (9-12) lists (LW); l/x/w = 0/1/1 is the plain
+       access in the same table.
+   * - PRM
+     - 14-46 (Type 7a figure)
+     - No M register field
+     - m at bits 29-27
+     - The Type 7a syntax uses Mb; field position from the PGR grid.
+   * - PRM
+     - 17-7 (Type 20a)
+     - The table labelled CACHE lists push/pop STS; DMCACHE gives
+       l1di = l1dwb = 1 as "writeback"
+     - fc is FLUSH CACHE; l1di = l1dwb = 1 is FLUSH DM_CACHE
+     - The STS table repeats the same rows; PMCACHE gives "flush" for the
+       same bits.
