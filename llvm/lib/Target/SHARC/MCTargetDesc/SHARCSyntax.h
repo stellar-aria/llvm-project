@@ -17,7 +17,7 @@
 //
 // Template language:
 //   $name[:f]     operand by name; f = x (hex), s (signed decimal),
-//                 h (signed hex), d (decimal)
+//                 h (signed hex), d (decimal), L (parse a symbol only)
 //   $I(g,f)       index register I(8*g + f); likewise $M and $B
 //   $Ix(g,a,b)    index register I(8*g + (a ^ b)); likewise $Bx
 //   $cat(h,l)[:f] immediate formed from fields h:l (sign-extended)
@@ -102,6 +102,7 @@ ArrayRef<SyntaxRow> getCommonParts();
 bool isComputation(unsigned Opcode);
 
 /// Evaluate "f=v,g=w,+feature,-feature" against \p MI's fields and \p FB.
+/// A row marked "@parse" is for the parser only and never holds here.
 bool condsHold(const MCInst &MI, StringRef Conds, const FeatureBitset &FB);
 
 /// Field value of a non-register operand, by name.

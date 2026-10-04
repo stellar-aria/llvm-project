@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SHARCFixupKinds.h"
 #include "SHARCMCTargetDesc.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCContext.h"
@@ -26,8 +27,31 @@ public:
 protected:
   unsigned getRelocType(const MCFixup &Fixup, const MCValue &Target,
                         bool IsPCRel) const override {
-    reportError(Fixup.getLoc(), "relocations are not supported yet");
-    return ELF::R_SHARC_NONE;
+    switch (unsigned(Fixup.getKind())) {
+    case FK_Data_4:
+      return ELF::R_SHARC_DATA32;
+    case SHARC::fixup_sharc_pcrel24_isa:
+      return ELF::R_SHARC_PCREL24_ISA;
+    case SHARC::fixup_sharc_pcrel24_visa:
+      return ELF::R_SHARC_PCREL24_VISA;
+    case SHARC::fixup_sharc_pcrel23_isa:
+      return ELF::R_SHARC_PCREL23_ISA;
+    case SHARC::fixup_sharc_pcrel23_visa:
+      return ELF::R_SHARC_PCREL23_VISA;
+    case SHARC::fixup_sharc_pcrel6_isa:
+      return ELF::R_SHARC_PCREL6_ISA;
+    case SHARC::fixup_sharc_pcrel6_visa:
+      return ELF::R_SHARC_PCREL6_VISA;
+    case SHARC::fixup_sharc_addr24_isa:
+      return ELF::R_SHARC_ADDR24_NW;
+    case SHARC::fixup_sharc_addr24_visa:
+      return ELF::R_SHARC_ADDR24_SW;
+    case SHARC::fixup_sharc_addr32:
+      return ELF::R_SHARC_ADDR32_NW;
+    default:
+      reportError(Fixup.getLoc(), "unsupported relocation");
+      return ELF::R_SHARC_NONE;
+    }
   }
 };
 

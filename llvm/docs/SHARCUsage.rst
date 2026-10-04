@@ -123,7 +123,52 @@ Type 17a and ``R0 = -1;`` may use the 32-bit Type 17b.
 Relocations
 ===========
 
-*In progress (milestone M1, task 11).*
+SHARC objects use RELA relocations. ``S`` is the symbol's ELF (byte)
+address, ``A`` the addend and ``P`` the address of the instruction holding
+the field; every relocation is placed at the start of its instruction. The
+word-space conversions are those of `Address units`_: ``nw48(x)`` is the
+normal-word address of the 48-bit instruction at byte address ``x``,
+``sw(x)``, ``nw(x)`` and ``lw(x)`` the short-, normal- and long-word
+addresses.
+
+========================== ==== ====================== ===================== =============
+Name                       Num  Field (window bits)    Value                 Range
+========================== ==== ====================== ===================== =============
+``R_SHARC_NONE``           0
+``R_SHARC_DATA32``         1    32-bit data word       ``S + A``             32 bits
+``R_SHARC_ADDR24_NW``      2    23-0                   ``nw48(S + A)``       unsigned 24
+``R_SHARC_ADDR24_SW``      3    23-0                   ``sw(S + A)``         unsigned 24
+``R_SHARC_ADDR32_NW``      4    31-0                   ``nw(S + A)``         32 bits
+``R_SHARC_ADDR32_SW``      5    31-0                   ``sw(S + A)``         32 bits
+``R_SHARC_ADDR32_LW``      6    31-0                   ``lw(S + A)``         32 bits
+``R_SHARC_ADDR32_BYTE``    7    31-0                   ``S + A``             32 bits
+``R_SHARC_PCREL24_ISA``    8    23-0                   ``(S + A - P) / 6``   signed 24
+``R_SHARC_PCREL24_VISA``   9    23-0                   ``(S + A - P) / 2``   signed 24
+``R_SHARC_PCREL23_ISA``    10   22-0                   ``(S + A - P) / 6``   signed 23
+``R_SHARC_PCREL23_VISA``   11   22-0                   ``(S + A - P) / 2``   signed 23
+``R_SHARC_PCREL6_ISA``     12   32, 31-27              ``(S + A - P) / 6``   signed 6
+``R_SHARC_PCREL6_VISA``    13   32, 31-27              ``(S + A - P) / 2``   signed 6
+``R_SHARC_IMM16``          14   reserved
+``R_SHARC_IMM7``           15   reserved
+``R_SHARC_IMM6``           16   reserved
+========================== ==== ====================== ===================== =============
+
+The assembler uses them as follows:
+
+* ``JUMP label``, ``CALL label`` and ``CJUMP label`` give a 24-bit absolute
+  code address: ``ADDR24_NW`` in ISA code, ``ADDR24_SW`` in VISA code.
+* ``(PC, label)`` and ``DO label UNTIL ...`` are PC-relative: ``PCREL24``,
+  or ``PCREL23`` for SHARC+ loops (whose bit 23 is the loop mode; on
+  classic cores a loop offset is 24 bits). Within one section the
+  assembler resolves them itself.
+* A symbol in a 32-bit field (``DM(sym)``, ``R0 = sym``) is a normal-word
+  address, ``ADDR32_NW``. Short-word, long-word and byte addresses
+  (``ADDR32_SW``, ``_LW``, ``_BYTE``) are reserved for operand specifiers
+  that are not implemented yet.
+* ``.word sym`` gives ``DATA32``.
+
+Symbols are not accepted in 16-, 7- or 6-bit data fields or 6-bit
+PC-relative fields; the assembler uses a wider form instead.
 
 Manual errata
 =============

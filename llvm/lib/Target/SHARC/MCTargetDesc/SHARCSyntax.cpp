@@ -147,6 +147,9 @@ bool SHARC::condsHold(const MCInst &MI, StringRef Conds,
   Conds.split(Terms, ',', -1, /*KeepEmpty=*/false);
   for (StringRef T : Terms) {
     T = T.trim();
+    // Rows for parsing only (e.g. "DO label UNTIL LCE") never print.
+    if (T == "@parse")
+      return false;
     if (T.consume_front("+") || T.starts_with("-")) {
       bool Want = !T.consume_front("-");
       std::optional<unsigned> F = featureByName(T);

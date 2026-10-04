@@ -62,6 +62,7 @@ struct Node {
   enum KindTy { Literal, Placeholder, Part, Optional, List } Kind;
   AsmToken Tok;                  // Literal
   std::string Name;              // Placeholder, Part
+  char Fmt = 0;                  // Placeholder print format; 'L' = symbol
   SmallVector<std::string, 3> Args;
   std::vector<Node> Children;    // Optional; List (Part nodes)
 };
@@ -193,6 +194,8 @@ public:
                                bool MatchingInlineAsm) override;
   void convertToMapAndConstraints(unsigned Kind,
                                   const OperandVector &Operands) override {}
+  ParseStatus parseDirective(AsmToken DirectiveID) override;
+
   /// "R0 = R1 + R2;" is an instruction, not a symbol assignment.
   bool equalIsAsmAssignment() override { return false; }
   /// "F3:2 = F5:4 + F9:8;" starts with a register pair, not a label.
@@ -329,8 +332,10 @@ Seq SHARCAsmParser::parseTemplate(StringRef T) {
           N.Args.push_back(A.trim().str());
         I = E + 1;
       }
-      if (C == '$' && I + 1 < T.size() && T[I] == ':' && isAlpha(T[I + 1]))
-        I += 2; // The print format does not affect parsing.
+      if (C == '$' && I + 1 < T.size() && T[I] == ':' && isAlpha(T[I + 1])) {
+        N.Fmt = T[I + 1];
+        I += 2;
+      }
     }
     Out.push_back(N);
     Start = I;
@@ -379,6 +384,8 @@ bool SHARCAsmParser::applyConds(StringRef Conds, State &St) const {
   Conds.split(Terms, ',', -1, false);
   for (StringRef T : Terms) {
     T = T.trim();
+    if (T == "@parse")
+      continue;
     if (T.starts_with("+") || T.starts_with("-")) {
       bool Want = T[0] == '+';
       StringRef F = T.drop_front();
@@ -558,7 +565,7 @@ std::optional<std::pair<size_t, Value>> SHARCAsmParser::immAt(size_t Pos) {
     return std::nullopt;
   MCContext &Ctx = getContext();
   const MCExpr *E = MCSymbolRefExpr::create(
-      Ctx.getOrCreateSymbol(Toks[Pos].getString()), Ctx);
+      Ctx.getOrCreateSymbol(Toks[Pos].getString()), Ctx, Toks[Pos].getLoc());
   ++Pos;
   if (Pos + 1 < Toks.size() &&
       (Toks[Pos].is(AsmToken::Plus) || Toks[Pos].is(AsmToken::Minus)) &&
@@ -723,6 +730,16 @@ void SHARCAsmParser::matchPlaceholder(unsigned Opc, const Node &N, size_t Pos,
   case OpKind::PCRel: {
     auto V = immAt(Pos);
     if (!V)
+      return;
+    // Symbols only where a fixup can place them (SHARCFixupKinds.h): 24- and
+    // 23-bit PC-relative offsets, 24-bit code addresses and 32-bit fields.
+    if (V->second.Kind == Value::Expr &&
+        !(O->Kind == OpKind::PCRel ? O->Width >= 23
+                                   : O->Width == 32 ||
+                                         (O->Kind == OpKind::Addr &&
+                                          O->Width == 24)))
+      return;
+    if (N.Fmt == 'L' && V->second.Kind != Value::Expr)
       return;
     if (V->second.Kind == Value::Imm) {
       int64_t X = V->second.I;
@@ -961,6 +978,21 @@ bool SHARCAsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
   Out.emitInstruction(*Parsed, getSTI());
   Parsed.reset();
   return false;
+}
+
+/// .word: 32-bit data words, like .4byte.
+ParseStatus SHARCAsmParser::parseDirective(AsmToken DirectiveID) {
+  if (DirectiveID.getString() != ".word")
+    return ParseStatus::NoMatch;
+  auto ParseOne = [&]() -> bool {
+    const MCExpr *Value;
+    SMLoc Loc = getLexer().getLoc();
+    if (getParser().parseExpression(Value))
+      return true;
+    getParser().getStreamer().emitValue(Value, 4, Loc);
+    return false;
+  };
+  return getParser().parseMany(ParseOne);
 }
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeSHARCAsmParser() {

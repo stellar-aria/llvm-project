@@ -253,6 +253,14 @@ SHARC_SYNTAX(T12a_ureg, "-sharcplus", "LCNTR = $ureg, DO (PC, $cat(mode,reladdr)
 SHARC_SYNTAX(T13a, "+sharcplus,mode=0", "DO (PC, $reladdr) UNTIL $term")
 SHARC_SYNTAX(T13a, "+sharcplus,mode=1", "DO (PC, $reladdr) UNTIL $term (F)")
 SHARC_SYNTAX(T13a, "-sharcplus", "DO (PC, $cat(mode,reladdr)) UNTIL $term")
+// A loop end written as a label: the offset to it is PC-relative (parse
+// only; the printer writes "(PC, offset)").
+SHARC_SYNTAX(T12a_imm, "@parse,mode=0", "LCNTR = $data:d, DO $reladdr:L UNTIL LCE")
+SHARC_SYNTAX(T12a_imm, "@parse,+sharcplus,mode=1", "LCNTR = $data:d, DO $reladdr:L UNTIL LCE (F)")
+SHARC_SYNTAX(T12a_ureg, "@parse,mode=0", "LCNTR = $ureg, DO $reladdr:L UNTIL LCE")
+SHARC_SYNTAX(T12a_ureg, "@parse,+sharcplus,mode=1", "LCNTR = $ureg, DO $reladdr:L UNTIL LCE (F)")
+SHARC_SYNTAX(T13a, "@parse,mode=0", "DO $reladdr:L UNTIL $term")
+SHARC_SYNTAX(T13a, "@parse,+sharcplus,mode=1", "DO $reladdr:L UNTIL $term (F)")
 
 //===----------------------------------------------------------------------===//
 // Group III: immediate data moves (PRM ch. 16)

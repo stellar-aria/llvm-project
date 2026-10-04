@@ -6,8 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SHARCFixupKinds.h"
 #include "SHARCMCTargetDesc.h"
 #include "SHARCParcels.h"
+#include "SHARCSyntax.h"
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
@@ -123,13 +125,57 @@ SHARCMCCodeEmitter::getDblRegOpValue(const MCInst &MI, unsigned OpNo,
   return MRI.getEncodingValue(Even);
 }
 
+/// The fixup for a symbolic operand, from the field's width and kind and the
+/// section mode. The parser only accepts symbols in fields listed here.
+static std::optional<SHARC::Fixups> fixupFor(const MCInst &MI, unsigned OpNo,
+                                            bool PCRel,
+                                            const MCSubtargetInfo &STI) {
+  bool VISA = STI.hasFeature(SHARC::FeatureVISASection);
+  for (const SHARC::OperandInfo &O : SHARC::getOperandInfo(MI.getOpcode())) {
+    if (O.Index != OpNo)
+      continue;
+    if (PCRel) {
+      switch (O.Width) {
+      case 24:
+        return VISA ? SHARC::fixup_sharc_pcrel24_visa
+                    : SHARC::fixup_sharc_pcrel24_isa;
+      case 23:
+        // On classic cores the loop offset is 24 bits (bit 23 is the SHARC+
+        // loop mode).
+        if (!STI.hasFeature(SHARC::FeatureSHARCPlus))
+          return VISA ? SHARC::fixup_sharc_pcrel24_visa
+                      : SHARC::fixup_sharc_pcrel24_isa;
+        return VISA ? SHARC::fixup_sharc_pcrel23_visa
+                    : SHARC::fixup_sharc_pcrel23_isa;
+      case 6:
+        return VISA ? SHARC::fixup_sharc_pcrel6_visa
+                    : SHARC::fixup_sharc_pcrel6_isa;
+      default:
+        return std::nullopt;
+      }
+    }
+    if (O.Width == 24 && O.Kind == SHARC::OpKind::Addr)
+      return VISA ? SHARC::fixup_sharc_addr24_visa
+                  : SHARC::fixup_sharc_addr24_isa;
+    if (O.Width == 32)
+      return SHARC::fixup_sharc_addr32;
+    return std::nullopt;
+  }
+  return std::nullopt;
+}
+
 uint64_t SHARCMCCodeEmitter::getImmOpValue(const MCInst &MI, unsigned OpNo,
                                            SmallVectorImpl<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isImm())
     return MO.getImm();
-  Ctx.reportError(SMLoc(), "symbolic operands are not supported yet");
+  std::optional<SHARC::Fixups> Kind = fixupFor(MI, OpNo, false, STI);
+  if (!Kind) {
+    Ctx.reportError(MI.getLoc(), "this field cannot hold a symbol");
+    return 0;
+  }
+  Fixups.push_back(MCFixup::create(0, MO.getExpr(), *Kind));
   return 0;
 }
 
@@ -137,7 +183,16 @@ uint64_t
 SHARCMCCodeEmitter::getPCRelOpValue(const MCInst &MI, unsigned OpNo,
                                     SmallVectorImpl<MCFixup> &Fixups,
                                     const MCSubtargetInfo &STI) const {
-  return getImmOpValue(MI, OpNo, Fixups, STI);
+  const MCOperand &MO = MI.getOperand(OpNo);
+  if (MO.isImm())
+    return MO.getImm();
+  std::optional<SHARC::Fixups> Kind = fixupFor(MI, OpNo, true, STI);
+  if (!Kind) {
+    Ctx.reportError(MI.getLoc(), "this field cannot hold a symbol");
+    return 0;
+  }
+  Fixups.push_back(MCFixup::create(0, MO.getExpr(), *Kind, /*PCRel=*/true));
+  return 0;
 }
 
 #include "SHARCGenMCCodeEmitter.inc"
