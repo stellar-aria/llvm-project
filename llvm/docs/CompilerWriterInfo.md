@@ -128,6 +128,11 @@ Refer to {doc}`AMDGPUUsage` for additional documentation.
 
 * [Hexagon Programmer's Reference Manuals and Hexagon ABI Specification (registration required, free sign-up)](https://developer.qualcomm.com/software/hexagon-dsp-sdk/tools)
 
+### SHARC
+
+* SHARC Processor Programming Reference (ADSP-2136x/2137x/214xx), Rev 2.4, on analog.com
+* [SHARC+ Core Programming Reference (ADSP-SC5xx/215xx), Rev 1.5](https://www.analog.com/media/en/dsp-documentation/processor-manuals/sc58x-2158x-prm.pdf)
+
 ### Other relevant lists
 
 * [GCC reading list](http://gcc.gnu.org/readings.html)

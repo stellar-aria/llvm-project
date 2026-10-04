@@ -135,19 +135,20 @@ Sources are cited as PGR/PRM page (physical PDF page).
   data 4, SW 2, LW 8, SHARC+ byte space 1.
 - For data, NW×4 = SW×2 = LW×8 is the same physical byte, and on SHARC+ the
   ELF data address equals the real byte-space address.
-- **Open item (blocks M1 completion):** 48-bit ISA code occupies three 16-bit
-  columns with rotation rules (PGR p296–300). The proposed model gives all
-  code sections SW-based byte addresses (SW×2), and ISA code relocations do
-  the per-block conversion from SW to NW-48 addresses. This must be checked
-  against the PGR memory chapter. If it fails, the fallback is a
-  per-output-section address unit recorded in a SHARC-specific program header
-  or section attribute.
+- **Resolved (M1 Task 1):** 48-bit NW words pack densely, so the mapping is
+  affine per memory block (PGR p300, PRM p228–229). ELF addresses are the
+  hardware byte-space address on SHARC+ and `2 × SW` on classic SHARC. Every
+  word-space field is `Wbase + (S + A − Bbase) / unit` for the memory block
+  containing `S + A`, with block bases from a per-CPU table in LLD (M2). See
+  `llvm/docs/SHARCUsage.rst`, "Address units". This replaces the earlier
+  "data address = NW×4 = real byte address" assumption, which holds only up
+  to a per-region offset on SHARC+ (PRM Table 6-4).
 - **Byte order in the file:** `ELFDATA2LSB`. An instruction is stored as
   16-bit parcels, most significant parcel first, and each parcel is
   little-endian. This matches the layout observed in real SHARC+ images
-  (digiemu `tools/sharcspec/sharc_decode.py`) and SHARC+ byte-space data
-  being little-endian. The layout of 32-bit data words in images is checked
-  in Task 1 of the M1 plan; M2 handles anything the loader has to adapt.
+  (digiemu `tools/sharcspec/sharc_decode.py`). Data is plain little-endian
+  (a 32-bit word is an ordinary LE 32-bit value), as digiemu's loader
+  analysis also finds.
 - **Relocations** (our own numbering, documented in `SHARCUsage.rst`):
   - absolute: `R_SHARC_ADDR24_{NW,SW}`, `R_SHARC_ADDR32_{NW,SW,LW,BYTE}`,
     `R_SHARC_DATA32`

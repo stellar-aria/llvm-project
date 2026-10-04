@@ -61,6 +61,7 @@ AArch64SME
 CompileCudaWithLLVM
 NVPTXUsage
 AMDGPUUsage
+SHARCUsage
 AMDGPUAsyncOperations
 AMDGPUDMAOperations
 AMDGPUExecutionSynchronization
@@ -345,6 +346,11 @@ yaml2obj
 - {doc}`AMDGPUUsage`
 
   This document describes using the AMDGPU backend to compile GPU kernels.
+
+- {doc}`SHARCUsage`
+
+  This document describes the experimental SHARC target: object file layout,
+  address units, relocations and manual errata.
 
 - {doc}`AMDGPUAsyncOperations`
 
