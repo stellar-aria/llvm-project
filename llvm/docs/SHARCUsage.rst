@@ -216,7 +216,11 @@ VISA code.
 Manual errata
 =============
 
-*In progress (milestone M1, task 15).*
+Many PRM encoding figures start from a template whose cells print default
+digits. Where a figure's fixed digits are the unedited template, or a copy of
+another figure, LLVM follows the PGR's opcode grids; the shading (which bits
+are fixed) is still taken from the PRM. Encodings were also checked against
+an independent transcription of both manuals.
 
 .. list-table::
    :header-rows: 1
@@ -275,10 +279,14 @@ Manual errata
      - Undefined; decoded with a warning
      - SHARC+ code sets it in one place; its meaning is open.
    * - PRM
-     - 14-46 (Type 7a figure)
-     - No M register field
-     - m at bits 29-27
-     - The Type 7a syntax uses Mb; field position from the PGR grid.
+     - 14-48 (Type 7a figure)
+     - A copy of the Type 7d figure: breg and toby, no M field, and no
+       position for the w and l bits of the BH table
+     - The PGR grid (m at 29-27), plus w at bit 39 and l at bit 23 (also in
+       Type 7b)
+     - The Type 7a syntax uses Mb. Type 7d, "an extension (address switch) to
+       7a", fixes bits 39 and 23 at 1: the w = l = 1 combination the BH table
+       leaves out. The positions are inferred from this, not drawn.
    * - PRM
      - 17-7 (Type 20a)
      - The table labelled CACHE lists push/pop STS; DMCACHE gives
@@ -286,3 +294,76 @@ Manual errata
      - fc is FLUSH CACHE; l1di = l1dwb = 1 is FLUSH DM_CACHE
      - The STS table repeats the same rows; PMCACHE gives "flush" for the
        same bits.
+   * - PRM
+     - 14-9 (Type 2a figure)
+     - Fixed bits 47-38 are 0010000000 (the Type 1a template)
+     - 000 at 47-45, 00001 at 44-40
+     - PGR Type 2a grid (10-6).
+   * - PRM
+     - 14-11 (Type 2b figure)
+     - Bits 47-39 are 110000000 (template)
+     - 000000011
+     - PGR Type 2b grid (10-6).
+   * - PRM
+     - 14-15 (Type 3a figure)
+     - The figure is a copy of Type 1a
+     - PGR Type 3a layout
+     - The figure's inner caption reads Type1a.
+   * - PRM
+     - 14-31 (Type 4b figure)
+     - Label dreg[6:0] over a 4-bit field
+     - 4-bit dreg
+     - Matches Types 4a and 4d and the PGR.
+   * - PRM
+     - 14-40, 15-12 (Types 5b, 9b)
+     - VISA marker at bits 22-16 drawn 0000000
+     - 0111111
+     - PGR Type 5b and 9b grids.
+   * - PRM
+     - 15-22 (Type 11c figure)
+     - Bits 47-41 are 1100000 (template)
+     - 0000101
+     - PGR Type 11c grid (10-18).
+   * - PRM
+     - 16-17 (Type 17a figure)
+     - Label i[2:0] over the 7-bit field at 38-32
+     - ureg[6:0]
+     - The syntax and the PGR grid name a Ureg.
+   * - PRM
+     - 16-18 (Type 17b figure)
+     - Bits 47-39 are 100100000, the Type 16b prefix
+     - 000011111
+     - PGR Type 17b grid (10-23).
+   * - PRM
+     - 17-18 (Type 25a rframe)
+     - 0001 1010 0000 0100 in bits 47-32, bits 23-0 open
+     - 0x190000000000
+     - PGR RFRAME grid (10-29); its prefix agrees with the Type 25c RFRAME (0x1901).
+   * - PRM
+     - 17-19 (Type 25c figure)
+     - A copy of the 32-bit Type 25a rframe figure
+     - 16-bit 0001100100000001
+     - PGR Type 25c grid (10-29).
+   * - PRM
+     - 17-7 (Type 19a bitrev)
+     - Bits 41-39 are 000; Type 19a modify has sc[1:0] and w there
+     - 101, as in the PGR; sc and w are not supported
+     - Open: with sc and w, bitrev and modify overlap; SHARC+ semantics of sc/w are not described.
+   * - PRM
+     - 18-10, 18-11 (Table 18-9)
+     - Shift-immediate codes 011001 for BITEXT (NU), 011011 for Rn OR FDEP
+       and 011101 for Rn OR FDEP (SE)
+     - 010110, 011001 and 011011
+     - The PGR's rule (Table 12-11, 12-10): the Type 6 code is the upper six
+       bits of the shifter opcode, which the table's other rows and its own
+       shifter column (01011000, 01100100, 01101100) follow.
+   * - PRM
+     - 18-10, 18-11 (Table 18-9)
+     - No BITDEP row
+     - BITDEP Rx BY Ry and BY <bitlen12> (0111 0100, 011101)
+     - PGR Table 12-11 (214xx and later).
+   * - PRM
+     - 18-4 (Figure 18-3)
+     - dataex[3:0] drawn at bits 26-23
+     - Bits 30-27 of the Type 6a word
+     - The Type 6a figures of both manuals put DATAEX at 30-27.
