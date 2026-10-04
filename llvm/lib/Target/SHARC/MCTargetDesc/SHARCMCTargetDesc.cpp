@@ -69,4 +69,6 @@ LLVMInitializeSHARCTargetMC() {
   TargetRegistry::RegisterMCRegInfo(T, createSHARCMCRegisterInfo);
   TargetRegistry::RegisterMCSubtargetInfo(T, createSHARCMCSubtargetInfo);
   TargetRegistry::RegisterMCInstPrinter(T, createSHARCMCInstPrinter);
+  TargetRegistry::RegisterMCCodeEmitter(T, createSHARCMCCodeEmitter);
+  TargetRegistry::RegisterMCAsmBackend(T, createSHARCAsmBackend);
 }

@@ -4,6 +4,7 @@ set(LLVM_TARGET_DEFINITIONS SHARC.td)
 
 tablegen(LLVM SHARCGenDisassemblerTables.inc -gen-disassembler)
 tablegen(LLVM SHARCGenInstrInfo.inc -gen-instr-info)
+tablegen(LLVM SHARCGenMCCodeEmitter.inc -gen-emitter)
 tablegen(LLVM SHARCGenRegisterInfo.inc -gen-register-info)
 tablegen(LLVM SHARCGenSubtargetInfo.inc -gen-subtarget)
 
@@ -26,6 +27,7 @@ add_llvm_target(SHARCCodeGen
   SHARC
   )
 
+add_subdirectory(AsmParser)
 add_subdirectory(Disassembler)
 add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)

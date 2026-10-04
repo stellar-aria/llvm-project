@@ -197,6 +197,14 @@ void Renderer::printImm(int64_t V, unsigned Width, char Fmt, raw_ostream &OS) {
   case 's':
     OS << (Width < 64 ? SignExtend64(V, Width) : V);
     return;
+  case 'h': {
+    int64_t S = Width < 64 ? SignExtend64(V, Width) : V;
+    if (S < 0)
+      OS << "-0x" << utohexstr(uint64_t(-S), /*LowerCase=*/true);
+    else
+      OS << "0x" << utohexstr(uint64_t(S), /*LowerCase=*/true);
+    return;
+  }
   default:
     OS << uint64_t(V);
     return;

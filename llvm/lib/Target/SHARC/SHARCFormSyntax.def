@@ -298,11 +298,12 @@ SHARC_SYNTAX(T15b, "d=1", "%OFF = $ureg%LW")
 // Type 16a/16b: store an immediate (PRM 16-13, 16-14). The sl and by bits
 // of Type 16a are not described; only encodings with both clear print.
 SHARC_SYNTAX(T16a, "", "%MEMPOST = $data:x")
-SHARC_SYNTAX(T16b, "", "%MEMPOST = $data:x")
+SHARC_SYNTAX(T16b, "", "%MEMPOST = $data:h")
 
-// Type 17a/17b: Ureg = immediate (PRM 16-16, 16-17).
+// Type 17a/17b: Ureg = immediate (PRM 16-16, 16-17). Short data is printed
+// as a signed value: see SHARCUsage.rst, "Immediate data".
 SHARC_SYNTAX(T17a, "", "$ureg = $data:x")
-SHARC_SYNTAX(T17b, "", "$ureg = $data:x")
+SHARC_SYNTAX(T17b, "", "$ureg = $data:h")
 
 //===----------------------------------------------------------------------===//
 // Group IV: miscellaneous (PRM ch. 17)

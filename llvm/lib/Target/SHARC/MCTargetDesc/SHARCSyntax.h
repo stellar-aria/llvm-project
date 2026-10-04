@@ -16,7 +16,8 @@
 // - SHARCComputeSyntax.def gives each computation's template.
 //
 // Template language:
-//   $name[:f]     operand by name; f = x (hex), s (signed), d (decimal)
+//   $name[:f]     operand by name; f = x (hex), s (signed decimal),
+//                 h (signed hex), d (decimal)
 //   $I(g,f)       index register I(8*g + f); likewise $M and $B
 //   $Ix(g,a,b)    index register I(8*g + (a ^ b)); likewise $Bx
 //   $cat(h,l)[:f] immediate formed from fields h:l (sign-extended)

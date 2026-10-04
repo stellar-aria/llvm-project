@@ -1,0 +1,19 @@
+## Every vector in the disassembler tests prints, and the printed text
+## reassembles to the same bytes.
+# RUN: %python %S/Inputs/roundtrip.py llvm-mc %S/../Disassembler/SHARC/isa-forms.txt \
+# RUN:   -mcpu=adsp-2137x | FileCheck %s --check-prefix=ISA
+# RUN: %python %S/Inputs/roundtrip.py llvm-mc %S/../Disassembler/SHARC/isa-basic.txt \
+# RUN:   -mcpu=adsp-2137x | FileCheck %s --check-prefix=BASIC
+# RUN: %python %S/Inputs/roundtrip.py llvm-mc %S/../Disassembler/SHARC/isa-sharcplus.txt \
+# RUN:   -mcpu=adsp-2156x | FileCheck %s --check-prefix=PLUS
+# RUN: %python %S/Inputs/roundtrip.py llvm-mc %S/../Disassembler/SHARC/visa-forms.txt \
+# RUN:   -mcpu=adsp-214xx -mattr=+visa-section | FileCheck %s --check-prefix=VISA
+
+# ISA-NOT: FAIL
+# ISA: roundtrip: [[N:[0-9]+]] of [[N]] ok
+# BASIC-NOT: FAIL
+# BASIC: roundtrip: [[N:[0-9]+]] of [[N]] ok
+# PLUS-NOT: FAIL
+# PLUS: roundtrip: [[N:[0-9]+]] of [[N]] ok
+# VISA-NOT: FAIL
+# VISA: roundtrip: [[N:[0-9]+]] of [[N]] ok

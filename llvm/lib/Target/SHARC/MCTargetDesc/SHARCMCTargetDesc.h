@@ -9,6 +9,29 @@
 #ifndef LLVM_LIB_TARGET_SHARC_MCTARGETDESC_SHARCMCTARGETDESC_H
 #define LLVM_LIB_TARGET_SHARC_MCTARGETDESC_SHARCMCTARGETDESC_H
 
+#include <cstdint>
+#include <memory>
+
+namespace llvm {
+class MCAsmBackend;
+class MCCodeEmitter;
+class MCContext;
+class MCInstrInfo;
+class MCObjectTargetWriter;
+class MCRegisterInfo;
+class MCSubtargetInfo;
+class MCTargetOptions;
+class Target;
+
+MCCodeEmitter *createSHARCMCCodeEmitter(const MCInstrInfo &MCII,
+                                        MCContext &Ctx);
+MCAsmBackend *createSHARCAsmBackend(const Target &T,
+                                    const MCSubtargetInfo &STI,
+                                    const MCRegisterInfo &MRI,
+                                    const MCTargetOptions &Options);
+std::unique_ptr<MCObjectTargetWriter> createSHARCELFObjectWriter(uint8_t OSABI);
+} // end namespace llvm
+
 // Defines symbolic names for SHARC registers.
 #define GET_REGINFO_ENUM
 #include "SHARCGenRegisterInfo.inc"

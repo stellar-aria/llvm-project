@@ -106,6 +106,20 @@ parcels in VISA code (2 bytes each, since the VISA PC is an SW address, PRM
 p118), so PC-relative fixups within one section are resolved by the
 assembler without block bases.
 
+Immediate data
+==============
+
+The 6-bit modifier of Type 4 (``<data6>``), the 7-bit offset of Type 15b
+(``<data7>``) and the 16-bit data of Types 16b and 17b (``<data16>``) are
+treated as sign-extended to 32 bits. Neither manual states how these
+fields are extended; the manuals call only the PC-relative offsets two's
+complement (PGR p16557, p16875). The assumption agrees with MAME's ADSP-2106x
+interpreter (``<data6>``) and with digiemu's SHARC+ trace tooling
+(``<data7>``, ``<data16>``), and is checked against real firmware and by
+execution in milestones M1 and M2. The assembler accepts only values the
+field holds exactly under this rule, so ``R0 = 0xFFFF;`` uses the 48-bit
+Type 17a and ``R0 = -1;`` may use the 32-bit Type 17b.
+
 Relocations
 ===========
 
