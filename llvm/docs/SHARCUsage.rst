@@ -73,8 +73,11 @@ address ``n/2`` name the same location.
 with no gaps: the first row of NW 48-bit address ``n`` is ``(n - B) * 3/4``
 rows into the block (PGR p300, PRM p228-229). The PRM writes "3/2"
 but describes the same operation (``x + (x << 1)``, then ``>> 2``); see
-`Manual errata`_. The 48-bit word ``n`` therefore starts at SW address
-``2B + 3(n - B)``.
+`Manual errata`_. The 48-bit word ``n`` of a block therefore starts at SW
+address ``2 * NWbase + 3 * (n - ISAbase)``, where ``NWbase`` and ``ISAbase``
+are the block's first normal-word and 48-bit addresses. On SHARC+ they are
+equal (``2B + 3(n - B)``); on the ADSP-2137x they are not (block 0 RAM: ISA
+0x90000, NW 0x98000).
 
 The byte address of a location is defined per memory block:
 
@@ -89,7 +92,7 @@ The byte address of a location is defined per memory block:
 So every conversion has the form ``word = Wbase + (S + A - Bbase) / unit``,
 where ``Bbase`` and ``Wbase`` are the byte and word base of the memory block
 containing ``S + A``. The linker takes them from a per-processor block table
-(milestone M2):
+(see `Linking`_). Relative to a block's normal-word base ``B`` they are:
 
 =================== ====================== ===============================
 Field address kind  ``unit`` (bytes)       Word base for the block
@@ -97,8 +100,8 @@ Field address kind  ``unit`` (bytes)       Word base for the block
 NW 32-bit data      4                      ``B``
 SW (incl. VISA PC)  2                      ``2B``
 LW                  8                      ``B / 2``
-NW 48-bit code      6                      ``B`` (the ISA instruction
-                                           address)
+NW 48-bit code      6                      ``B`` on SHARC+; its own base
+                                           on the ADSP-2137x
 Byte space          1                      (none; field = ``S + A``)
 =================== ====================== ===============================
 
@@ -171,8 +174,80 @@ The assembler uses them as follows:
   that are not implemented yet.
 * ``.word sym`` gives ``DATA32``.
 
-Symbols are not accepted in 16-, 7- or 6-bit data fields or 6-bit
-PC-relative fields; the assembler uses a wider form instead.
+Symbols are not accepted in 16-, 7- or 6-bit data fields; the assembler
+uses a wider form instead. A 6-bit PC-relative field takes a symbol only in
+Type 10a, which has no wider form; across sections it gets ``PCREL6``.
+
+Linking
+=======
+
+LLD links SHARC objects for the ADSP-2156x, ADSP-21371 and ADSP-21375. The
+processor comes from ``e_flags``: SHARC+ objects use the ADSP-2156x map, and
+classic objects must name a part (``-mcpu=adsp-21371`` or
+``-mcpu=adsp-21375``); objects without a part link with ones that have one.
+
+Block table
+-----------
+
+``llvm/include/llvm/TargetParser/SHARCMemoryMap.def`` lists each processor's
+memory blocks: the byte range and, for each address kind, the word address
+of the block's first byte, or none where the block has no such view. The
+rows come from the data sheets:
+
+* ADSP-21562/3/5/6/7/9 data sheet Rev. D, Table 2 (L1 blocks 0-3) and
+  Table 3 (L2 RAM). The L2 row is the 8 Mb part's range; the 2 and 4 Mb
+  parts start L2 higher. L2 has a 48-bit, a normal-word and a VISA view but
+  no long-word or short-word data view. Table 3 prints the last L2 48-bit
+  address as 0x5EAAAA, which would end 2 bytes past L2; the table stops at
+  the last whole instruction, 0x5EAAA9.
+* ADSP-21371/21375 data sheet Rev. D, Table 3 (ADSP-21371) and Table 4
+  (ADSP-21375): internal RAM only, with the same bases and 0x8000 or 0x4000
+  bytes per block.
+
+Linker scripts
+--------------
+
+``llvm/utils/sharc/ldscripts`` has a script per processor (``-T``). Code
+goes in block 0 (and ``.l2text`` in L2 on the ADSP-2156x), data in block 1,
+and ``__stack_end`` is the top of block 1. Scripts use byte addresses.
+
+48-bit code must start on a 48-bit row of its block: a multiple of 6 bytes
+from the block's ISA base. ``ALIGN`` cannot express this; round with
+arithmetic, as the scripts do::
+
+  . = ORIGIN(B0) + ((. - ORIGIN(B0) + 5) / 6) * 6;
+
+Code sections are 2-byte aligned and 48-bit code is 6 bytes per
+instruction, so sections concatenated after an aligned start stay on rows.
+Without a script the image starts at the first block, after the ELF
+headers; only VISA code can be placed that way.
+
+Errors
+------
+
+.. list-table::
+   :header-rows: 1
+
+   * - Error
+     - Fix
+   * - *address ... is outside the memory blocks of ...*
+     - Place the target in a block of the processor.
+   * - *... has no <kind> view*
+     - Use an address kind the block has (there is no long-word access to L2, for example).
+   * - *address ... is not a <kind> address in ...*
+     - Align the target to the kind's unit (for code, 6 bytes from the block's ISA base).
+   * - *relocation ... out of range*
+     - Use a form with a wider field.
+   * - *branch crosses from ... to ...*
+     - Use an absolute ``JUMP`` or ``CALL`` between blocks.
+   * - *cannot link object files for different SHARC processors* (or *parts*)
+     - Assemble all objects for one processor.
+   * - *no SHARC memory map for these objects*
+     - Assemble classic code with a part.
+   * - *output section ... mixes VISA (...) and ISA code*
+     - Put VISA and ISA code in separate output sections.
+   * - *section ... holds 48-bit code but starts at ...*
+     - Round the section start as above.
 
 Hardware loops
 ==============
