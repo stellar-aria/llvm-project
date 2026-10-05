@@ -14,6 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "InputFiles.h"
+#include "OutputSections.h"
 #include "Symbols.h"
 #include "Target.h"
 #include "llvm/BinaryFormat/ELF.h"
@@ -37,6 +38,7 @@ public:
                      const uint8_t *loc) const override;
   void relocate(uint8_t *loc, const Relocation &rel,
                 uint64_t val) const override;
+  void relocateAlloc(InputSection &sec, uint8_t *buf) const override;
 
 private:
   // The processor whose memory table resolves word addresses; set by
@@ -118,6 +120,41 @@ RelExpr SHARCTarget::getRelExpr(RelType type, const Symbol &s,
   }
 }
 
+// The symbol a relocation refers to, or its section for a section symbol.
+static std::string target(const Relocation &rel) {
+  if (!rel.sym->getName().empty())
+    return rel.sym->getName().str();
+  if (auto *d = dyn_cast<Defined>(rel.sym))
+    if (d->section)
+      return d->section->name.str();
+  return "<unnamed>";
+}
+
+// The address kind of an absolute relocation's field.
+static SHARC::AddrKind addrKind(RelType type) {
+  switch (type) {
+  case R_SHARC_ADDR24_NW:
+    return SHARC::AddrKind::ISA;
+  case R_SHARC_ADDR24_SW:
+    return SHARC::AddrKind::SWCode;
+  case R_SHARC_ADDR32_NW:
+    return SHARC::AddrKind::NW;
+  case R_SHARC_ADDR32_SW:
+    return SHARC::AddrKind::SWData;
+  case R_SHARC_ADDR32_LW:
+    return SHARC::AddrKind::LW;
+  default:
+    return SHARC::AddrKind::Byte;
+  }
+}
+
+static StringRef kindName(SHARC::AddrKind k) {
+  static const char *const names[] = {"long-word",       "normal-word",
+                                      "48-bit instruction", "short-word code",
+                                      "short-word data", "byte"};
+  return names[unsigned(k)];
+}
+
 void SHARCTarget::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   if (rel.type == R_SHARC_DATA32) {
     checkIntUInt(ctx, loc, val, 32, rel);
@@ -131,7 +168,7 @@ void SHARCTarget::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) co
     int64_t off = int64_t(val);
     int64_t unit = SHARC::pcRelRelocUnit(rel.type);
     if (off % unit) {
-      Err(ctx) << getErrorLoc(ctx, loc) << rel.type << " against " << rel.sym
+      Err(ctx) << getErrorLoc(ctx, loc) << rel.type << " against " << target(rel)
                << ": target is not on an instruction boundary";
       return;
     }
@@ -139,7 +176,60 @@ void SHARCTarget::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) co
     SHARC::insertField(loc, segs, uint64_t(off / unit));
     return;
   }
-  Err(ctx) << getErrorLoc(ctx, loc) << "unrecognized relocation " << rel.type;
+  if (segs.empty()) {
+    Err(ctx) << getErrorLoc(ctx, loc) << "unrecognized relocation "
+             << rel.type;
+    return;
+  }
+
+  // An absolute field holds the word address of S + A in the kind of its
+  // relocation, through the block containing it.
+  uint64_t addr = uint32_t(val);
+  SHARC::AddrKind kind = addrKind(rel.type);
+  const SHARC::Block *b = SHARC::findBlock(cpu, addr);
+  if (!b) {
+    Err(ctx) << getErrorLoc(ctx, loc) << rel.type << " against " << target(rel)
+             << ": address 0x" << utohexstr(addr)
+             << " is outside the memory blocks of " << cpu;
+    return;
+  }
+  if (b->WordBase[unsigned(kind)] == SHARC::NoView) {
+    Err(ctx) << getErrorLoc(ctx, loc) << rel.type << " against " << target(rel)
+             << ": " << b->Name << " has no " << kindName(kind) << " view";
+    return;
+  }
+  std::optional<uint64_t> word = SHARC::toWord(*b, kind, addr);
+  if (!word) {
+    Err(ctx) << getErrorLoc(ctx, loc) << rel.type << " against " << target(rel)
+             << ": address 0x" << utohexstr(addr) << " is not a "
+             << kindName(kind) << " address in " << b->Name;
+    return;
+  }
+  checkUInt(ctx, loc, *word, width, rel);
+  SHARC::insertField(loc, segs, *word);
+}
+
+// PC-relative offsets count instructions or parcels, which is only meaningful
+// within one memory block: check that the target is in P's block.
+void SHARCTarget::relocateAlloc(InputSection &sec, uint8_t *buf) const {
+  uint64_t secAddr = sec.getOutputSection()->addr + sec.outSecOff;
+  for (const Relocation &rel : sec.relocs()) {
+    uint8_t *loc = buf + rel.offset;
+    uint64_t p = secAddr + rel.offset;
+    uint64_t val = SignExtend64(sec.getRelocTargetVA(ctx, rel, p), 32);
+    if (SHARC::isPCRelReloc(rel.type)) {
+      const SHARC::Block *from = SHARC::findBlock(cpu, p);
+      const SHARC::Block *to = SHARC::findBlock(cpu, uint32_t(p + val));
+      if (from != to) {
+        Err(ctx) << getErrorLoc(ctx, loc) << rel.type << " against "
+                 << target(rel) << ": branch crosses from "
+                 << (from ? from->Name : StringRef("unmapped memory"))
+                 << " to " << (to ? to->Name : StringRef("unmapped memory"));
+        continue;
+      }
+    }
+    relocate(loc, rel, val);
+  }
 }
 
 void elf::setSHARCTargetInfo(Ctx &ctx) { ctx.target.reset(new SHARCTarget(ctx)); }

@@ -1,0 +1,109 @@
+# REQUIRES: sharc
+# RUN: yaml2obj --docnum=1 %s -o %t.plus.o
+# RUN: ld.lld -T %S/Inputs/sharc-2156x-test.ld %t.plus.o -o %t.plus
+# RUN: llvm-objdump -s -j .text %t.plus | FileCheck %s --check-prefix=PLUS
+# RUN: llvm-objdump -s -j .vtext %t.plus | FileCheck %s --check-prefix=PLUSV
+# RUN: yaml2obj --docnum=2 %s -o %t.classic.o
+# RUN: ld.lld -T %S/Inputs/sharc-21371-test.ld %t.classic.o -o %t.classic
+# RUN: llvm-objdump -s -j .text %t.classic | FileCheck %s --check-prefix=CLASSIC
+
+## Relocation kinds the assembler does not emit. Each instruction is zero; a
+## 32-bit field is window bits 31-0, i.e. parcel 1 = value >> 16 and parcel 2
+## = value & 0xFFFF, each little-endian.
+##
+## ADSP-2156x, var = 0x2C0010 (block 1):
+##   ADDR32_SW:   SW 0x160000 + 0x10 / 2 = 0x160008 -> 00 00 16 00 08 00
+##   ADDR32_LW:   LW 0x58000 + 0x10 / 8 = 0x58002   -> 00 00 05 00 02 80
+##   ADDR32_BYTE: 0x2C0010                          -> 00 00 2c 00 10 00
+##   PCREL23_ISA at 0x240012 to 0x240030: 0x1E / 6 = 5, bit 23 (0x80 in
+##     byte 2) kept                                 -> 00 00 80 00 05 00
+##   PCREL6_ISA at 0x240018 to 0x240030: 0x18 / 6 = 4 = 0b000100; bit 32 = 0,
+##     bits 31-27 = 00100, so window bit 29 = parcel 1 bit 13 = 0x2000
+##                                                  -> 00 00 00 20 00 00
+# PLUS:      240000 00001600 08000000 05000280 00002c00
+# PLUS-NEXT: 240010 10000000 80000500 00000020 0000
+## VISA, .vtext at 0x240800, vfar at 0x240840:
+##   PCREL23_VISA at 0x240800: 0x40 / 2 = 32 = 0x20 -> 00 00 00 00 20 00
+##   PCREL6_VISA at 0x240806: 0x3A / 2 = 29 = 0b011101; bit 32 = 0,
+##     bits 31-27 = 11101, so parcel 1 = 0xE800     -> 00 00 00 e8 00 00
+# PLUSV: 240800 00000000 20000000 00e80000
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS32
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_SHARC
+  Flags:   [ EF_SHARC_MACH_SHARCPLUS ]
+Sections:
+  - Name:    .text
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_EXECINSTR ]
+    Content: '000000000000000000000000000000000000000080000000000000000000'
+  - Name:    .vtext
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_EXECINSTR, SHF_SHARC_VISA ]
+    Content: '000000000000000000000000'
+  - Name:    .vtext2
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_EXECINSTR, SHF_SHARC_VISA ]
+    Content: '0000'
+  - Name:    .text2
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_EXECINSTR ]
+    Content: '000000000000'
+  - Name:    .data
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_WRITE ]
+    Content: '0000000000000000000000000000000000000000'
+  - Name:    .rela.text
+    Type:    SHT_RELA
+    Info:    .text
+    Relocations:
+      - { Offset: 0x0,  Symbol: var,     Type: R_SHARC_ADDR32_SW }
+      - { Offset: 0x6,  Symbol: var,     Type: R_SHARC_ADDR32_LW }
+      - { Offset: 0xC,  Symbol: var,     Type: R_SHARC_ADDR32_BYTE }
+      - { Offset: 0x12, Symbol: target2, Type: R_SHARC_PCREL23_ISA }
+      - { Offset: 0x18, Symbol: target2, Type: R_SHARC_PCREL6_ISA }
+  - Name:    .rela.vtext
+    Type:    SHT_RELA
+    Info:    .vtext
+    Relocations:
+      - { Offset: 0x0, Symbol: vfar, Type: R_SHARC_PCREL23_VISA }
+      - { Offset: 0x6, Symbol: vfar, Type: R_SHARC_PCREL6_VISA }
+Symbols:
+  - { Name: var,     Section: .data,   Value: 0x10 }
+  - { Name: target2, Section: .text2,  Value: 0x0 }
+  - { Name: vfar,    Section: .vtext2, Value: 0x0 }
+...
+
+## ADSP-21371, var = 0x2E0010 (block 1 RAM):
+##   ADDR32_SW: SW 0x170000 + 0x10 / 2 = 0x170008 -> 00 00 17 00 08 00
+##   ADDR32_LW: LW 0x5C000 + 0x10 / 8 = 0x5C002   -> 00 00 05 00 02 c0
+# CLASSIC: 260000 00001700 08000000 050002c0
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS32
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_SHARC
+  Flags:   [ EF_SHARC_MACH_2137X, EF_SHARC_PART_21371 ]
+Sections:
+  - Name:    .text
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_EXECINSTR ]
+    Content: '000000000000000000000000'
+  - Name:    .data
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_WRITE ]
+    Content: '0000000000000000000000000000000000000000'
+  - Name:    .rela.text
+    Type:    SHT_RELA
+    Info:    .text
+    Relocations:
+      - { Offset: 0x0, Symbol: var, Type: R_SHARC_ADDR32_SW }
+      - { Offset: 0x6, Symbol: var, Type: R_SHARC_ADDR32_LW }
+Symbols:
+  - { Name: var, Section: .data, Value: 0x10 }
+...

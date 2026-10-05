@@ -1,0 +1,64 @@
+# REQUIRES: sharc
+# RUN: yaml2obj --docnum=1 %s -o %t.plus.o
+# RUN: not ld.lld -T %S/Inputs/sharc-2156x-test.ld %t.plus.o -o /dev/null 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=PLUS
+# RUN: yaml2obj --docnum=2 %s -o %t.classic.o
+# RUN: not ld.lld -T %S/Inputs/sharc-21371-test.ld %t.classic.o -o /dev/null 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=CLASSIC
+
+## L2 has no long-word view and no short-word data view (ADSP-2156x data
+## sheet, Table 3); classic processors have no byte space.
+# PLUS-DAG: error: {{.*}}R_SHARC_ADDR32_LW against l2var: l2 has no long-word view
+# PLUS-DAG: error: {{.*}}R_SHARC_ADDR32_SW against l2var: l2 has no short-word data view
+# CLASSIC: error: {{.*}}R_SHARC_ADDR32_BYTE against var: block1-ram has no byte view
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS32
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_SHARC
+  Flags:   [ EF_SHARC_MACH_SHARCPLUS ]
+Sections:
+  - Name:    .text
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_EXECINSTR ]
+    Content: '000000000000000000000000'
+  - Name:    .l2data
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_WRITE ]
+    Content: '00000000'
+  - Name:    .rela.text
+    Type:    SHT_RELA
+    Info:    .text
+    Relocations:
+      - { Offset: 0x0, Symbol: l2var, Type: R_SHARC_ADDR32_LW }
+      - { Offset: 0x6, Symbol: l2var, Type: R_SHARC_ADDR32_SW }
+Symbols:
+  - { Name: l2var, Section: .l2data, Value: 0x0 }
+...
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS32
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_SHARC
+  Flags:   [ EF_SHARC_MACH_2137X, EF_SHARC_PART_21371 ]
+Sections:
+  - Name:    .text
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_EXECINSTR ]
+    Content: '000000000000'
+  - Name:    .data
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_WRITE ]
+    Content: '00000000'
+  - Name:    .rela.text
+    Type:    SHT_RELA
+    Info:    .text
+    Relocations:
+      - { Offset: 0x0, Symbol: var, Type: R_SHARC_ADDR32_BYTE }
+Symbols:
+  - { Name: var, Section: .data, Value: 0x0 }
+...
