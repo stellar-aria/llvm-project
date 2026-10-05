@@ -81,6 +81,7 @@ llvm_config.feature_config(
                 "Hexagon": "hexagon",
                 "LoongArch": "loongarch",
                 "Mips": "mips",
+                "SHARC": "sharc",
                 "MSP430": "msp430",
                 "PowerPC": "ppc",
                 "RISCV": "riscv",
