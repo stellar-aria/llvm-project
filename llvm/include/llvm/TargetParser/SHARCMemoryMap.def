@@ -1,0 +1,46 @@
+//===- SHARCMemoryMap.def - SHARC memory blocks per processor ---*- C++ -*-===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// SHARC_BLOCK(CPU, NAME, BYTE_BASE, SIZE, LW, NW, ISA, SW_CODE, SW_DATA, BYTE)
+//
+// One row per memory block: its ELF byte range and, for each address kind,
+// the word address of the block's first byte (NONE if the block has no view
+// of that kind). See llvm/docs/SHARCUsage.rst, "Address units" and "Linking".
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SHARC_BLOCK
+#error "SHARC_BLOCK must be defined"
+#endif
+#define NONE (~0ULL)
+
+// ADSP-21562/3/5/6/7/9 data sheet Rev. D, Table 2 (L1, private address
+// space). ELF addresses are the byte-space addresses.
+SHARC_BLOCK("adsp-2156x", "l1-block0", 0x00240000, 0x30000, 0x48000, 0x90000, 0x90000, 0x120000, 0x120000, 0x00240000)
+SHARC_BLOCK("adsp-2156x", "l1-block1", 0x002C0000, 0x30000, 0x58000, 0xB0000, 0xB0000, 0x160000, 0x160000, 0x002C0000)
+SHARC_BLOCK("adsp-2156x", "l1-block2", 0x00300000, 0x20000, 0x60000, 0xC0000, 0xC0000, 0x180000, 0x180000, 0x00300000)
+SHARC_BLOCK("adsp-2156x", "l1-block3", 0x00380000, 0x20000, 0x70000, 0xE0000, 0xE0000, 0x1C0000, 0x1C0000, 0x00380000)
+// Table 3, L2 RAM (8 Mb). No long-word or short-word data view; the VISA
+// address space is in short-word units.
+SHARC_BLOCK("adsp-2156x", "l2", 0x20000000, 0x100000, NONE, 0x08000000, 0x5C0000, 0xB80000, NONE, 0x20000000)
+
+// ADSP-21371/21375 data sheet Rev. D, Table 3 (ADSP-21371 internal RAM).
+// Classic SHARC has no byte space and no VISA; ELF addresses are 2 * SW, and
+// SW_CODE equals SW_DATA only so that conversions are symmetric.
+SHARC_BLOCK("adsp-21371", "block0-ram", 0x00260000, 0x8000, 0x4C000, 0x98000, 0x90000, 0x130000, 0x130000, NONE)
+SHARC_BLOCK("adsp-21371", "block1-ram", 0x002E0000, 0x8000, 0x5C000, 0xB8000, 0xB0000, 0x170000, 0x170000, NONE)
+SHARC_BLOCK("adsp-21371", "block2-ram", 0x00300000, 0x8000, 0x60000, 0xC0000, 0xC0000, 0x180000, 0x180000, NONE)
+SHARC_BLOCK("adsp-21371", "block3-ram", 0x00380000, 0x8000, 0x70000, 0xE0000, 0xE0000, 0x1C0000, 0x1C0000, NONE)
+// Table 4 (ADSP-21375): the same bases with half the RAM per block.
+SHARC_BLOCK("adsp-21375", "block0-ram", 0x00260000, 0x4000, 0x4C000, 0x98000, 0x90000, 0x130000, 0x130000, NONE)
+SHARC_BLOCK("adsp-21375", "block1-ram", 0x002E0000, 0x4000, 0x5C000, 0xB8000, 0xB0000, 0x170000, 0x170000, NONE)
+SHARC_BLOCK("adsp-21375", "block2-ram", 0x00300000, 0x4000, 0x60000, 0xC0000, 0xC0000, 0x180000, 0x180000, NONE)
+SHARC_BLOCK("adsp-21375", "block3-ram", 0x00380000, 0x4000, 0x70000, 0xE0000, 0xE0000, 0x1C0000, 0x1C0000, NONE)
+
+#undef NONE
+#undef SHARC_BLOCK
