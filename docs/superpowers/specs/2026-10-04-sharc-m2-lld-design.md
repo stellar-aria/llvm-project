@@ -250,3 +250,38 @@ sheets in its references.
 4. llvm-objdump symbolizes absolute targets in linked images.
 5. All digiemu execution tests pass in sharcemu.
 6. The MC, SHARC and lld test suites pass.
+
+## 10. Status (2026-10-04)
+
+M2 is implemented on the `sharc` branch. Against §9:
+
+1. **Met.** lld tests apply every R_SHARC type 1-13 on adsp-2156x, and every
+   type whose kind exists on classic parts (DATA32, ADDR24_NW, ADDR32_NW/SW/LW,
+   PCREL24_ISA, PCREL23_ISA via the 2156x yaml only, PCREL6_ISA) on adsp-21371,
+   with hand-computed values; adsp-21375 is checked where it differs (block
+   size). Each §4.2 error and §4.3 rule has a test. The reserved IMM types
+   are rejected but not tested.
+2. **Met.** `SHARCMemoryMapTest` (7 tests) checks every block against the
+   data sheet range ends of adsp-2156x, adsp-21371 and adsp-21375.
+3. **Met.** `llvm/utils/sharc/ldscripts/adsp-2156x.ld`, `adsp-21371.ld` and
+   `adsp-21375.ld` place sections in the intended blocks.
+4. **Met.** llvm-objdump names the symbols of JUMP/CALL/CJUMP targets and
+   Type 14a data addresses in linked images.
+5. **Met.** Four sharcemu programs pass (L1-to-L2 call, data in another
+   block, loop plus cross-section call, address of a symbol from a second
+   object). This needed sharcemu to alias normal-, long- and short-word data
+   addresses to byte space through the shared table, as the hardware does
+   (user decision, 2026-10-04); firmware uses byte addresses and is not
+   affected, but the firmware-based sharcemu tests were not run.
+6. **Met.** MC, llvm-objdump, llvm-readobj, obj2yaml, yaml2obj, SHARC
+   CodeGen and lld ELF suites pass, as do the TargetParser and BinaryFormat
+   unit tests.
+
+Changes against the design made during M2:
+
+- adsp-2137x split into adsp-21371 and adsp-21375 (§3.2.1) with an e_flags
+  part field.
+- ISA code cannot be placed without a linker script (LLD aligns only to
+  powers of two); the default image base still serves VISA-only links.
+- `.text` is now 2-byte aligned in MC: at 4, a second object's 48-bit
+  section landed off its rows.
