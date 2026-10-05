@@ -7,7 +7,7 @@ Depends on: M1 (MC layer, relocations R_SHARC_* in `llvm/docs/SHARCUsage.rst`)
 ## 1. Goal and scope
 
 LLD links SHARC objects produced by the M1 assembler into executable ELF images
-for **adsp-2156x** (SHARC+) and **adsp-2137x** (classic). Word-addressed
+for **adsp-2156x** (SHARC+) and the classic **adsp-21371** and **adsp-21375**. Word-addressed
 relocation fields are resolved through a per-CPU memory block table taken from
 the public data sheets. digiemu's sharcemu runs the linked 2156x images as
 execution tests.
@@ -84,7 +84,7 @@ into L2 is an error while `ADDR24_SW` (a VISA code address) is allowed. The
 table therefore splits `sw` into `sw_code` and `sw_data` columns; L1 blocks
 have both, L2 only `sw_code`.
 
-adsp-2137x (Table 3, ADSP-21371; RAM only; byte = 2 * SW):
+adsp-21371 (Table 3; RAM only; byte = 2 * SW):
 
 | Block | Byte (2*SW) | LW | ISA | NW | SW |
 |---|---|---|---|---|---|
@@ -93,9 +93,24 @@ adsp-2137x (Table 3, ADSP-21371; RAM only; byte = 2 * SW):
 | block 2 RAM | 0x00300000, 0x8000 | 0x60000 | 0xC0000 | 0xC0000 | 0x180000 |
 | block 3 RAM | 0x00380000, 0x8000 | 0x70000 | 0xE0000 | 0xE0000 | 0x1C0000 |
 
-The adsp-2137x CPU covers both parts; the ADSP-21375 (Table 4) is checked to
-have the same RAM addresses before the row is committed, and if it differs the
-CPU name splits.
+adsp-21375 (Table 4) has the same bases with half the RAM per block: each
+block is 0x4000 bytes (block 0 RAM: NW 0x98000-0x98FFF, ISA 0x90000-0x90AA9).
+
+### 3.2.1 Processor parts in e_flags
+
+The two classic parts differ only in RAM size, so they share
+`EF_SHARC_MACH_2137X` and are told apart by a new field,
+`EF_SHARC_PART = 0x000000f0`: `EF_SHARC_PART_NONE = 0`,
+`EF_SHARC_PART_21371 = 0x10`, `EF_SHARC_PART_21375 = 0x20`.
+
+- CPUs `adsp-21371` and `adsp-21375` are added with the features of
+  `adsp-2137x`; the assembler sets the part field from `-mcpu`. `adsp-2137x`
+  stays as a generic CPU with no part and no memory map.
+- `getSHARCCPUName` returns the part name when the field is set.
+- LLD: objects with no part link with objects of one part, and the output
+  carries that part; two different parts are an error. A classic link where
+  no input names a part is an error asking for `-mcpu=adsp-21371` or
+  `-mcpu=adsp-21375`. SHARC+ objects with no part use the adsp-2156x table.
 
 `byte` is present for every 2156x block and absent for 2137x (classic has no
 byte space; `ADDR32_BYTE` is an error there).
@@ -109,7 +124,8 @@ byte space; `ADDR32_BYTE` is an error there).
 - `std::optional<uint64_t> toWord(const SHARCBlock &, SHARCAddrKind, uint64_t Byte);`
   (nullopt for absent kind, misalignment or out of range)
 - `std::optional<uint64_t> toByte(StringRef CPU, SHARCAddrKind, uint64_t Word);`
-- `StringRef cpuForEFlags(unsigned EFlags);` (from `EF_SHARC_MACH_*`)
+- `StringRef memoryMapCPU(unsigned EFlags);` (from `EF_SHARC_MACH_*` and
+  `EF_SHARC_PART_*`; "" when no table applies)
 
 ### 3.4 Correction to M1 docs
 
@@ -147,16 +163,17 @@ Each names the relocation type, the symbol and the input section:
 
 1. target outside every block of the CPU;
 2. the block has no view of the needed kind (e.g. `ADDR32_LW` into L2,
-   `ADDR32_BYTE` on 2137x);
+   `ADDR32_BYTE` on classic parts);
 3. target misaligned for the unit (ISA: `(S + A - Bbase) % 6 != 0`);
 4. value out of range for the field;
 5. PC-relative pair crossing blocks;
-6. `e_flags` machine mismatch between inputs.
+6. `e_flags` machine or part mismatch between inputs, or no part on a classic
+   link.
 
 ### 4.3 Output rules
 
-- `calcEFlags`: every input has the same `EF_SHARC_MACH` (or none); the output
-  carries it. No machine anywhere: error, since relocations need a CPU.
+- `calcEFlags`: every input has the same `EF_SHARC_MACH` (or none) and the
+  same `EF_SHARC_PART` (or none); the output carries both (§3.2.1). No machine anywhere: error, since relocations need a CPU.
 - `SHF_SHARC_VISA` is kept on output sections; an output section mixing VISA
   and non-VISA executable input sections is an error.
 - A non-VISA executable output section must start at a multiple of 6 bytes from
@@ -173,7 +190,7 @@ Each names the relocation type, the symbol and the input section:
 
 ## 5. Default linker scripts
 
-`llvm/utils/sharc/ldscripts/adsp-2156x.ld` and `adsp-2137x.ld`, GNU-ld syntax,
+`llvm/utils/sharc/ldscripts/adsp-2156x.ld`, `adsp-21371.ld` and `adsp-21375.ld`, GNU-ld syntax,
 byte addresses:
 
 - `MEMORY` region per block of §3.2.
