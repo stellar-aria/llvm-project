@@ -392,7 +392,14 @@ StringRef ELFObjectFileBase::getSHARCCPUName() const {
   case ELF::EF_SHARC_MACH_2136X:
     return "adsp-2136x";
   case ELF::EF_SHARC_MACH_2137X:
-    return "adsp-2137x";
+    switch (getPlatformFlags() & ELF::EF_SHARC_PART) {
+    case ELF::EF_SHARC_PART_21371:
+      return "adsp-21371";
+    case ELF::EF_SHARC_PART_21375:
+      return "adsp-21375";
+    default:
+      return "adsp-2137x";
+    }
   case ELF::EF_SHARC_MACH_214XX:
     return "adsp-214xx";
   case ELF::EF_SHARC_MACH_SHARCPLUS:

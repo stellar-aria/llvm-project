@@ -36,7 +36,11 @@ Object file layout
 
 SHARC objects are ``ELFCLASS32``, ``ELFDATA2LSB``, ``EM_SHARC`` (133).
 ``e_flags`` bits 0-3 identify the processor family: 1 = ADSP-2136x,
-2 = ADSP-2137x, 3 = ADSP-214xx, 4 = SHARC+.
+2 = ADSP-2137x, 3 = ADSP-214xx, 4 = SHARC+. Bits 4-7 name the part where
+parts of one family have different memory maps: 1 = ADSP-21371 and
+2 = ADSP-21375 (both family 2; ``-mcpu=adsp-21371`` and ``adsp-21375``).
+0 means no particular part, as ``-mcpu=adsp-2137x`` produces; the linker
+needs a part to resolve addresses on classic processors.
 
 Instructions are stored as 16-bit parcels, most significant parcel first;
 each parcel is little-endian. A 48-bit instruction ``0x013E00001012`` is

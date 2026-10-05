@@ -1114,6 +1114,11 @@ enum : unsigned {
   EF_SHARC_MACH_2137X = 0x00000002,
   EF_SHARC_MACH_214XX = 0x00000003,
   EF_SHARC_MACH_SHARCPLUS = 0x00000004,
+  // The processor part, where parts of one machine differ in memory map.
+  EF_SHARC_PART = 0x000000f0,
+  EF_SHARC_PART_NONE = 0x00000000,
+  EF_SHARC_PART_21371 = 0x00000010,
+  EF_SHARC_PART_21375 = 0x00000020,
 };
 
 // ELF Relocation types for SHARC

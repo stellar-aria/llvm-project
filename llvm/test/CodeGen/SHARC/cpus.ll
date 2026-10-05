@@ -4,6 +4,8 @@
 
 ; CHECK: Available CPUs for this target:
 ; CHECK: adsp-2136x
+; CHECK: adsp-21371
+; CHECK: adsp-21375
 ; CHECK: adsp-2137x
 ; CHECK: adsp-214xx
 ; CHECK: adsp-2156x

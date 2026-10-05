@@ -59,6 +59,9 @@ def SHARCInstrInfo : InstrInfo;
 
 def : ProcessorModel<"adsp-2136x", NoSchedModel, []>;
 def : ProcessorModel<"adsp-2137x", NoSchedModel, []>;
+// Parts of the ADSP-2137x family with their own memory maps (ELF part field).
+def : ProcessorModel<"adsp-21371", NoSchedModel, []>;
+def : ProcessorModel<"adsp-21375", NoSchedModel, []>;
 def : ProcessorModel<"adsp-214xx", NoSchedModel, [FeatureVISA]>;
 def : ProcessorModel<"adsp-2156x", NoSchedModel, [FeatureSHARCPlus]>;
 def : ProcessorModel<"adsp-sc58x", NoSchedModel, [FeatureSHARCPlus]>;

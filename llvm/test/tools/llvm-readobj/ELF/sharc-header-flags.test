@@ -10,6 +10,13 @@
 # RUN: llvm-readobj --file-headers %t.plus | FileCheck --check-prefixes=ALL,PLUS %s
 # RUN: obj2yaml %t.plus | FileCheck --check-prefix=YAML %s
 
+## The classic parts share EF_SHARC_MACH_2137X and differ in EF_SHARC_PART.
+# RUN: yaml2obj %s -o %t.21371 -DMACH="2137X, EF_SHARC_PART_21371"
+# RUN: llvm-readobj --file-headers %t.21371 | FileCheck --check-prefixes=ALL,P21371 %s
+# RUN: obj2yaml %t.21371 | FileCheck --check-prefix=YAML21371 %s
+# RUN: yaml2obj %s -o %t.21375 -DMACH="2137X, EF_SHARC_PART_21375"
+# RUN: llvm-readobj --file-headers %t.21375 | FileCheck --check-prefixes=ALL,P21375 %s
+
 # ALL:    Format: elf32-sharc
 # ALL:    Arch: sharc
 # ALL:    Machine: EM_SHARC (0x85)
@@ -18,9 +25,14 @@
 # M2137X:   EF_SHARC_MACH_2137X (0x2)
 # M214XX:   EF_SHARC_MACH_214XX (0x3)
 # PLUS:     EF_SHARC_MACH_SHARCPLUS (0x4)
+# P21371:   EF_SHARC_MACH_2137X (0x2)
+# P21371:   EF_SHARC_PART_21371 (0x10)
+# P21375:   EF_SHARC_MACH_2137X (0x2)
+# P21375:   EF_SHARC_PART_21375 (0x20)
 # ALL:    ]
 
 # YAML: Flags: [ EF_SHARC_MACH_SHARCPLUS ]
+# YAML21371: Flags: [ EF_SHARC_MACH_2137X, EF_SHARC_PART_21371 ]
 
 --- !ELF
 FileHeader:

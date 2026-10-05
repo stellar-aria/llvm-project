@@ -1842,6 +1842,8 @@ constexpr EnumStringDef<unsigned, 2> ElfHeaderSHARCFlagsDefs[] = {
     ENUM_ENT(EF_SHARC_MACH_2137X, "adsp-2137x"),
     ENUM_ENT(EF_SHARC_MACH_214XX, "adsp-214xx"),
     ENUM_ENT(EF_SHARC_MACH_SHARCPLUS, "sharcplus"),
+    ENUM_ENT(EF_SHARC_PART_21371, "adsp-21371"),
+    ENUM_ENT(EF_SHARC_PART_21375, "adsp-21375"),
 };
 constexpr auto ElfHeaderSHARCFlags =
     BUILD_ENUM_STRINGS(ElfHeaderSHARCFlagsDefs);
@@ -3837,7 +3839,8 @@ template <class ELFT> void GNUELFDumper<ELFT>::printFileHeaders() {
                           unsigned(ELF::EF_XTENSA_MACH));
   else if (e.e_machine == EM_SHARC)
     ElfFlags = printFlags(e.e_flags, EnumStrings(ElfHeaderSHARCFlags),
-                          unsigned(ELF::EF_SHARC_MACH));
+                          unsigned(ELF::EF_SHARC_MACH),
+                          unsigned(ELF::EF_SHARC_PART));
   else if (e.e_machine == EM_CUDA) {
     unsigned Mask = e.e_ident[ELF::EI_ABIVERSION] == ELF::ELFABIVERSION_CUDA_V1
                         ? ELF::EF_CUDA_SM
@@ -7798,7 +7801,8 @@ template <class ELFT> void LLVMELFDumper<ELFT>::printFileHeaders() {
                    unsigned(ELF::EF_XTENSA_MACH));
     else if (E.e_machine == EM_SHARC)
       W.printFlags("Flags", E.e_flags, EnumStrings(ElfHeaderSHARCFlags),
-                   unsigned(ELF::EF_SHARC_MACH));
+                   unsigned(ELF::EF_SHARC_MACH),
+                   unsigned(ELF::EF_SHARC_PART));
     else if (E.e_machine == EM_CUDA)
       W.printFlags("Flags", E.e_flags, EnumStrings(ElfHeaderNVPTXFlags),
                    unsigned(ELF::EF_CUDA_SM));
