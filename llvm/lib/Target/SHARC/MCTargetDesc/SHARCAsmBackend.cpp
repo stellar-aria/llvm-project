@@ -8,7 +8,6 @@
 
 #include "SHARCFixupKinds.h"
 #include "SHARCMCTargetDesc.h"
-#include "SHARCParcels.h"
 #include "SHARCSyntax.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCInst.h"
@@ -146,26 +145,7 @@ void SHARCAsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
     return;
   }
 
-  // Scatter the value over the field's bits, most significant segment first,
-  // and rewrite the parcels the field touches.
-  unsigned Avail;
-  ArrayRef<uint8_t> Bytes(Data, 6);
-  uint64_t W = SHARC::readWindow(Bytes, Avail);
-  unsigned Remaining = Width;
-  unsigned FirstParcel = 2, LastParcel = 0;
-  for (auto [Hi, Lo] : SHARC::fixupSegments(Kind)) {
-    unsigned N = Hi - Lo + 1;
-    Remaining -= N;
-    uint64_t Part = (uint64_t(V) >> Remaining) & maskTrailingOnes<uint64_t>(N);
-    W = (W & ~(maskTrailingOnes<uint64_t>(N) << Lo)) | (Part << Lo);
-    FirstParcel = std::min(FirstParcel, (47 - Hi) / 16);
-    LastParcel = std::max(LastParcel, (47 - Lo) / 16);
-  }
-  for (unsigned P = FirstParcel; P <= LastParcel; ++P) {
-    uint16_t Parcel = (W >> (32 - 16 * P)) & 0xFFFF;
-    Data[2 * P] = uint8_t(Parcel);
-    Data[2 * P + 1] = uint8_t(Parcel >> 8);
-  }
+  SHARC::insertField(Data, SHARC::fixupSegments(Kind), uint64_t(V));
 }
 
 bool SHARCAsmBackend::fixupNeedsRelaxationAdvanced(const MCFragment &F,

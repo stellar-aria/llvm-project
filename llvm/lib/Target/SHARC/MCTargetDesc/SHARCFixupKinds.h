@@ -18,6 +18,7 @@
 #define LLVM_LIB_TARGET_SHARC_MCTARGETDESC_SHARCFIXUPKINDS_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/BinaryFormat/SHARCRelocFields.h"
 #include "llvm/MC/MCFixup.h"
 #include <utility>
 
@@ -47,32 +48,28 @@ enum Fixups {
 };
 
 /// Bit ranges (hi, lo) of a fixup's field in the 48-bit instruction window,
-/// most significant first.
+/// most significant first (the relocation's field, SHARCRelocFields.h).
 inline ArrayRef<std::pair<unsigned, unsigned>> fixupSegments(unsigned Kind) {
-  static const std::pair<unsigned, unsigned> Bits24[] = {{23, 0}};
-  static const std::pair<unsigned, unsigned> Bits23[] = {{22, 0}};
-  static const std::pair<unsigned, unsigned> Bits6[] = {{32, 32}, {31, 27}};
-  static const std::pair<unsigned, unsigned> Bits32[] = {{31, 0}};
   static const std::pair<unsigned, unsigned> Bit23[] = {{23, 23}};
   switch (Kind) {
   case fixup_sharc_pcrel24_isa:
   case fixup_sharc_pcrel24_visa:
   case fixup_sharc_addr24_isa:
   case fixup_sharc_addr24_visa:
-    return Bits24;
+    return relocFieldSegments(ELF::R_SHARC_ADDR24_NW);
   case fixup_sharc_pcrel23_isa:
   case fixup_sharc_pcrel23_visa:
-    return Bits23;
+    return relocFieldSegments(ELF::R_SHARC_PCREL23_ISA);
   case fixup_sharc_pcrel6_isa:
   case fixup_sharc_pcrel6_visa:
-    return Bits6;
+    return relocFieldSegments(ELF::R_SHARC_PCREL6_ISA);
   case fixup_sharc_loop_mode:
     return Bit23;
   case fixup_sharc_loop_end:
   case fixup_sharc_loop_end_fixed:
     return {};
   default:
-    return Bits32;
+    return relocFieldSegments(ELF::R_SHARC_ADDR32_NW);
   }
 }
 

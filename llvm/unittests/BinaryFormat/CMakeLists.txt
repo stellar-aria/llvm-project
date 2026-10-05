@@ -11,6 +11,7 @@ add_llvm_unittest(BinaryFormatTests
   MsgPackReaderTest.cpp
   MsgPackWriterTest.cpp
   SFrameTest.cpp
+  SHARCRelocFieldsTest.cpp
   TestFileMagic.cpp
   )
 
