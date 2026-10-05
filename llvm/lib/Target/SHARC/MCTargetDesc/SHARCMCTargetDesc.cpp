@@ -11,12 +11,14 @@
 #include "SHARCMCAsmInfo.h"
 #include "SHARCTargetStreamer.h"
 #include "TargetInfo/SHARCTargetInfo.h"
+#include "llvm/MC/MCInstrAnalysis.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/TargetParser/SHARCMemoryMap.h"
 
 #define GET_INSTRINFO_MC_DESC
 #define ENABLE_INSTR_PREDICATE_VERIFIER
@@ -51,6 +53,50 @@ static MCObjectFileInfo *createSHARCMCObjectFileInfo(MCContext &Ctx, bool PIC,
   MCObjectFileInfo *MOFI = new SHARCMCObjectFileInfo();
   MOFI->initMCObjectFileInfo(Ctx, PIC, LargeCodeModel);
   return MOFI;
+}
+
+namespace {
+/// Absolute addresses in instruction fields are word addresses; map them back
+/// to ELF byte addresses through the processor's block table so that
+/// llvm-objdump can name their symbols.
+class SHARCMCInstrAnalysis : public MCInstrAnalysis {
+public:
+  explicit SHARCMCInstrAnalysis(const MCInstrInfo *Info)
+      : MCInstrAnalysis(Info) {}
+
+  std::optional<uint64_t>
+  evaluateMemoryOperandAddress(const MCInst &Inst, const MCSubtargetInfo *STI,
+                               uint64_t Addr, uint64_t Size) const override {
+    if (!STI)
+      return std::nullopt;
+    SHARC::AddrKind Kind;
+    switch (Inst.getOpcode()) {
+    case SHARC::T8a_abs:
+    case SHARC::T25a_direct:
+      // A code address: 48-bit in ISA code, short-word in VISA code.
+      Kind = STI->hasFeature(SHARC::FeatureVISASection)
+                 ? SHARC::AddrKind::SWCode
+                 : SHARC::AddrKind::ISA;
+      break;
+    case SHARC::T14a:
+      // Operand 2 is l, which selects a long-word access (PGR Type 14a).
+      Kind = Inst.getOperand(2).getImm() ? SHARC::AddrKind::LW
+                                         : SHARC::AddrKind::NW;
+      break;
+    default:
+      return std::nullopt;
+    }
+    // The address is the last operand of each of these forms.
+    const MCOperand &Op = Inst.getOperand(Inst.getNumOperands() - 1);
+    if (!Op.isImm())
+      return std::nullopt;
+    return SHARC::toByte(STI->getCPU(), Kind, uint64_t(Op.getImm()));
+  }
+};
+} // namespace
+
+static MCInstrAnalysis *createSHARCMCInstrAnalysis(const MCInstrInfo *Info) {
+  return new SHARCMCInstrAnalysis(Info);
 }
 
 static MCInstrInfo *createSHARCMCInstrInfo() {
@@ -101,6 +147,7 @@ LLVMInitializeSHARCTargetMC() {
   TargetRegistry::RegisterMCAsmInfo(T, createSHARCMCAsmInfo);
   TargetRegistry::RegisterMCObjectFileInfo(T, createSHARCMCObjectFileInfo);
   TargetRegistry::RegisterMCInstrInfo(T, createSHARCMCInstrInfo);
+  TargetRegistry::RegisterMCInstrAnalysis(T, createSHARCMCInstrAnalysis);
   TargetRegistry::RegisterMCRegInfo(T, createSHARCMCRegisterInfo);
   TargetRegistry::RegisterMCSubtargetInfo(T, createSHARCMCSubtargetInfo);
   TargetRegistry::RegisterMCInstPrinter(T, createSHARCMCInstPrinter);
