@@ -67,7 +67,7 @@ Clang will emit for classic SHARC in M5:
 |---|---|
 | `strings.ll` | `[N x i32]` strings; `strlen`, `strcmp`, `strchr`, `memcpy` of strings |
 | `aggregates.ll` | struct copy, assignment and zero-init (`memcpy`/`memset` lengths in 32-bit bytes) |
-| `pointers.ll` | `getelementptr i32`, `ptradd`, `i8` GEPs (sub-byte strides, invalid under `b:32`) |
+| `pointers.ll` | `getelementptr i32`, `ptradd`, `i64` and `i8` GEPs (an `i8` occupies a whole 32-bit byte, so it steps by 1 byte) |
 | `loop-idioms.ll` | loops LoopIdiomRecognize turns into `memset`/`memcpy`; LSR-reduced loops |
 | `globals.ll` | loads from constant globals and aggregates (ConstantFolding at byte offsets) |
 | `sroa.ll` | small struct allocas split by SROA |
