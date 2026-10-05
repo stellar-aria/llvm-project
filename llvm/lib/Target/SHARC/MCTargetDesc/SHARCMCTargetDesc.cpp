@@ -12,6 +12,7 @@
 #include "SHARCTargetStreamer.h"
 #include "TargetInfo/SHARCTargetInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
+#include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -33,6 +34,23 @@ static MCAsmInfo *createSHARCMCAsmInfo(const MCRegisterInfo &MRI,
                                        const Triple &TT,
                                        const MCTargetOptions &Options) {
   return new SHARCMCAsmInfo(TT, Options);
+}
+
+namespace {
+/// Code sections are aligned to the 16-bit parcel. 48-bit code is 6 bytes per
+/// instruction, so an alignment that does not divide 6 would move a section
+/// concatenated after another off its 48-bit rows.
+class SHARCMCObjectFileInfo : public MCObjectFileInfo {
+public:
+  unsigned getTextSectionAlignment() const override { return 2; }
+};
+} // namespace
+
+static MCObjectFileInfo *createSHARCMCObjectFileInfo(MCContext &Ctx, bool PIC,
+                                                     bool LargeCodeModel) {
+  MCObjectFileInfo *MOFI = new SHARCMCObjectFileInfo();
+  MOFI->initMCObjectFileInfo(Ctx, PIC, LargeCodeModel);
+  return MOFI;
 }
 
 static MCInstrInfo *createSHARCMCInstrInfo() {
@@ -81,6 +99,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void
 LLVMInitializeSHARCTargetMC() {
   Target &T = getTheSHARCTarget();
   TargetRegistry::RegisterMCAsmInfo(T, createSHARCMCAsmInfo);
+  TargetRegistry::RegisterMCObjectFileInfo(T, createSHARCMCObjectFileInfo);
   TargetRegistry::RegisterMCInstrInfo(T, createSHARCMCInstrInfo);
   TargetRegistry::RegisterMCRegInfo(T, createSHARCMCRegisterInfo);
   TargetRegistry::RegisterMCSubtargetInfo(T, createSHARCMCSubtargetInfo);

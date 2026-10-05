@@ -41,6 +41,9 @@ public:
   void relocateAlloc(InputSection &sec, uint8_t *buf) const override;
 
 private:
+  void checkSection(InputSection &sec, uint64_t addr) const;
+
+private:
   // The processor whose memory table resolves word addresses; set by
   // calcEFlags, which runs before any relocation is applied.
   mutable StringRef cpu;
@@ -80,6 +83,12 @@ uint32_t SHARCTarget::calcEFlags() const {
   uint32_t flags = mergeField(ctx, EF_SHARC_MACH, "processors") |
                    mergeField(ctx, EF_SHARC_PART, "parts");
   cpu = SHARC::memoryMapCPU(flags);
+  // A link without a script starts at the first block. The default image
+  // base depends on the processor, known only now; the driver reads it after
+  // this call.
+  if (!cpu.empty())
+    const_cast<SHARCTarget *>(this)->defaultImageBase =
+        SHARC::blocks(cpu).front().ByteBase;
   if (cpu.empty()) {
     if ((flags & EF_SHARC_MACH) == EF_SHARC_MACH_2137X)
       ErrAlways(ctx) << "no SHARC memory map for these objects; assemble "
@@ -209,10 +218,41 @@ void SHARCTarget::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) co
   SHARC::insertField(loc, segs, *word);
 }
 
+// A code section is decoded in one mode, chosen by its output section's
+// SHF_SHARC_VISA flag, and 48-bit code must sit on 48-bit rows of its block.
+void SHARCTarget::checkSection(InputSection &sec, uint64_t addr) const {
+  if (!(sec.flags & SHF_EXECINSTR) || sec.getSize() == 0)
+    return;
+  bool visa = sec.flags & SHF_SHARC_VISA;
+  OutputSection *osec = sec.getParent();
+  auto firstCode = [&]() -> InputSection * {
+    for (SectionCommand *cmd : osec->commands)
+      if (auto *isd = dyn_cast<InputSectionDescription>(cmd))
+        for (InputSection *isec : isd->sections)
+          if (isec->flags & SHF_EXECINSTR)
+            return isec;
+    return nullptr;
+  };
+  if (InputSection *first = firstCode();
+      first && bool(first->flags & SHF_SHARC_VISA) != visa)
+    Err(ctx) << "output section " << osec->name << " mixes VISA ("
+             << (visa ? sec.name : first->name) << ") and ISA code";
+  if (visa)
+    return;
+  const SHARC::Block *b = SHARC::findBlock(cpu, addr);
+  if (b && !SHARC::toWord(*b, SHARC::AddrKind::ISA, addr))
+    Err(ctx) << "section " << sec.name
+             << " holds 48-bit code but starts at 0x" << utohexstr(addr)
+             << ", which is not a 48-bit instruction address of " << b->Name
+             << "; place it with a linker script (see SHARCUsage.rst, "
+                "\"Linking\")";
+}
+
 // PC-relative offsets count instructions or parcels, which is only meaningful
 // within one memory block: check that the target is in P's block.
 void SHARCTarget::relocateAlloc(InputSection &sec, uint8_t *buf) const {
   uint64_t secAddr = sec.getOutputSection()->addr + sec.outSecOff;
+  checkSection(sec, secAddr);
   for (const Relocation &rel : sec.relocs()) {
     uint8_t *loc = buf + rel.offset;
     uint64_t p = secAddr + rel.offset;

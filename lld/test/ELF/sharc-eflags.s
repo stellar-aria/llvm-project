@@ -11,7 +11,7 @@
 
 ## An object without a part links with one that has a part, and the output
 ## carries it: EF_SHARC_MACH_2137X (2) | EF_SHARC_PART_21371 (0x10).
-# RUN: ld.lld %t.21371.o %t.generic.o -o %t.classic
+# RUN: ld.lld -T %S/Inputs/sharc-21371-test.ld %t.21371.o %t.generic.o -o %t.classic
 # RUN: llvm-readelf -h %t.classic | FileCheck %s --check-prefix=PART
 # PART: Flags: 0x12
 
