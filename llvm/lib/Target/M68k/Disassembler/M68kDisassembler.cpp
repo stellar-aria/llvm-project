@@ -125,6 +125,18 @@ static DecodeStatus DecodeImm32(MCInst &Inst, uint64_t Imm, uint64_t Address,
   return DecodeStatus::Success;
 }
 
+// A signed displacement. The two words of a 32-bit field come out of the
+// decoder swapped, as in DecodeImm32.
+template <unsigned N>
+static DecodeStatus DecodeSImm(MCInst &Inst, uint64_t Imm, uint64_t Address,
+                               const void *Decoder) {
+  assert(isUInt<N>(Imm) && "Invalid displacement");
+  if constexpr (N == 32)
+    Imm = M68k::swapWord<uint32_t>(Imm);
+  Inst.addOperand(MCOperand::createImm(SignExtend64<N>(Imm)));
+  return DecodeStatus::Success;
+}
+
 static DecodeStatus DecodeScale(MCInst &Inst, uint64_t Imm, uint64_t Address,
                                 const void *Decoder) {
   assert(isUInt<2>(Imm));

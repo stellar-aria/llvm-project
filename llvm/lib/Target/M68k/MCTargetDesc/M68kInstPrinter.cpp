@@ -160,6 +160,17 @@ void M68kInstPrinter::printScale(const MCInst *MI, unsigned opNum,
     O << "*" << Scale;
 }
 
+void M68kInstPrinter::printPCRelImm(const MCInst *MI, uint64_t Address,
+                                    unsigned opNum, raw_ostream &O) {
+  // A branch displacement is signed.
+  const MCOperand &MO = MI->getOperand(opNum);
+  if (MO.isImm() && MO.getImm() < 0) {
+    O << format("-$%" PRIx64, -(uint64_t)MO.getImm());
+    return;
+  }
+  printAbsMem(MI, opNum, O);
+}
+
 // NOTE forcing (W,L) size available since M68020 only
 void M68kInstPrinter::printAbsMem(const MCInst *MI, unsigned opNum,
                                   raw_ostream &O) {

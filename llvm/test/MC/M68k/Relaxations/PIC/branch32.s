@@ -28,7 +28,7 @@ RELAXED:
 
 ; CHECK-LABEL: <RELAXED_32>:
 RELAXED_32:
-	; CHECK: bra  $ff
+	; CHECK: bra  -$1
 	; CHECK-NEXT: 00 00
 	; CHECK-NEXT: 80 04
 	; INSTR: bra .LBB2_1 ; encoding: [0x60,A]

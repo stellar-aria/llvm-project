@@ -23,7 +23,7 @@ TIGHT:
 
 ; CHECK-LABEL: <RELAXED>:
 RELAXED:
-  ; CHECK: bsr.b   $82
+  ; CHECK: bsr.b   -$7e
 	bsr.b	.LBB1_2
 	move.l	$0, $0
 	move.l	$0, $0

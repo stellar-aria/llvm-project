@@ -187,15 +187,18 @@ foreach cc = [ "cc", "ls", "lt", "eq", "mi", "ne", "ge",
                "cs", "pl", "gt", "hi", "vc", "le", "vs"] in {
   def B#cc#"8"
     : MxBcc<cc, MxBrTarget8,
-            (operand "$dst", 8, (encoder "encodePCRelImm<8>")), (ascend)>;
+            (operand "$dst", 8, (encoder "encodePCRelImm<8>"),
+                                (decoder "DecodeSImm<8>")), (ascend)>;
 
   def B#cc#"16"
     : MxBcc<cc, MxBrTarget16, (descend 0b0000, 0b0000),
-            (operand "$dst", 16, (encoder "encodePCRelImm<16>"))>;
+            (operand "$dst", 16, (encoder "encodePCRelImm<16>"),
+                                 (decoder "DecodeSImm<16>"))>;
 
   def B#cc#"32"
     : MxBcc<cc, MxBrTarget32, (descend 0b1111, 0b1111),
-            (operand "$dst", 32, (encoder "encodePCRelImm<32>"))>;
+            (operand "$dst", 32, (encoder "encodePCRelImm<32>"),
+                                 (decoder "DecodeSImm<32>"))>;
 }
 
 foreach cc = [ "cc", "ls", "lt", "eq", "mi", "ne", "ge",
@@ -226,14 +229,16 @@ class MxBra<Operand TARGET, dag disp_8, dag disp_16_32>
 }
 
 def BRA8  : MxBra<MxBrTarget8,
-                  (operand "$dst", 8, (encoder "encodePCRelImm<8>")), (ascend)>;
+                  (operand "$dst", 8, (encoder "encodePCRelImm<8>"),
+                                      (decoder "DecodeSImm<8>")), (ascend)>;
 
 def BRA16 : MxBra<MxBrTarget16, (descend 0b0000, 0b0000),
-                  (operand "$dst", 16, (encoder "encodePCRelImm<16>"))>;
+                  (operand "$dst", 16, (encoder "encodePCRelImm<16>"),
+                                       (decoder "DecodeSImm<16>"))>;
 
 def BRA32 : MxBra<MxBrTarget32, (descend 0b1111, 0b1111),
                   (operand "$dst", 32, (encoder "encodePCRelImm<32>"),
-                                       (decoder "DecodeImm32"))>;
+                                       (decoder "DecodeSImm<32>"))>;
 
 def : Pat<(br bb:$target), (BRA8 MxBrTarget8:$target)>;
 
@@ -258,14 +263,16 @@ class MxBsr<Operand TARGET, MxType TYPE, dag disp_8, dag disp_16_32>
 }
 
 def BSR8 : MxBsr<MxBrTarget8, MxType8,
-                (operand "$dst", 8, (encoder "encodePCRelImm<8>")), (ascend)>;
+                (operand "$dst", 8, (encoder "encodePCRelImm<8>"),
+                                    (decoder "DecodeSImm<8>")), (ascend)>;
 
 def BSR16 : MxBsr<MxBrTarget16, MxType16, (descend 0b0000, 0b0000),
-                (operand "$dst", 16, (encoder "encodePCRelImm<16>"))>;
+                (operand "$dst", 16, (encoder "encodePCRelImm<16>"),
+                                     (decoder "DecodeSImm<16>"))>;
 
 def BSR32 : MxBsr<MxBrTarget32, MxType32, (descend 0b1111, 0b1111),
                 (operand "$dst", 32, (encoder "encodePCRelImm<32>"),
-                                     (decoder "DecodeImm32"))>;
+                                     (decoder "DecodeSImm<32>"))>;
 
 //===----------------------------------------------------------------------===//
 // Call

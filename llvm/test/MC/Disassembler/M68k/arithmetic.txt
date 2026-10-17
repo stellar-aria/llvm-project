@@ -107,7 +107,7 @@
 # CHECK: or.l    (55,%pc,%a1), %d6
 0x8c 0xbb 0x98 0x37
 
-# CHECK: or.l    (38967,%a3), %d6
+# CHECK: or.l    (-26569,%a3), %d6
 0x8c 0xab 0x98 0x37
 
 # CHECK: or.l    %d6, (48,%a4,%a2)

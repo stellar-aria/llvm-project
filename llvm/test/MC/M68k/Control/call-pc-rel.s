@@ -14,7 +14,7 @@ BACKWARD:
 ; CHECK-LABEL: PCI:
 PCI:
 	; CHECK:     jsr  (BACKWARD,%pc,%d0)
-        ; CHECK-OBJ: jsr  (250,%pc,%d0)
+        ; CHECK-OBJ: jsr  (-6,%pc,%d0)
 	; CHECK-SAME: encoding: [0x4e,0xbb,0x08,A]
 	jsr	(BACKWARD,%pc,%d0)
 	; CHECK:     jsr  (FORWARD,%pc,%d0)
@@ -25,7 +25,7 @@ PCI:
 ; CHECK-LABEL: PCD:
 PCD:
 	; CHECK:     jsr  (BACKWARD,%pc)
-	; CHECK-OBJ: jsr  (65522,%pc)
+	; CHECK-OBJ: jsr  (-14,%pc)
 	; CHECK-SAME: encoding: [0x4e,0xba,A,A]
 	jsr	(BACKWARD,%pc)
 	; CHECK:     jsr  (FORWARD,%pc)

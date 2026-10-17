@@ -61,9 +61,7 @@ private:
   //===----------------------------------------------------------------------===//
   //
   void printPCRelImm(const MCInst *MI, uint64_t Address, unsigned opNum,
-                     raw_ostream &O) {
-    printAbsMem(MI, opNum, O);
-  }
+                     raw_ostream &O);
 
   void printARI8Mem(const MCInst *MI, unsigned opNum, raw_ostream &O) {
     printARIMem(MI, opNum, O);

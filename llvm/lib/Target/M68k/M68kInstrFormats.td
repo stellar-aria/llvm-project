@@ -91,7 +91,8 @@ class MxEncBriefExt<string reg_opnd, string disp_opnd,
     ),
     0b0,
     // Displacement
-    (operand "$"#disp_opnd, 8, (encoder disp_encoder))
+    (operand "$"#disp_opnd, 8, (encoder disp_encoder),
+             (decoder "DecodeSImm<8>"))
   );
 }
 
@@ -155,7 +156,8 @@ class MxEncAddrMode_q<string opnd_name> : MxEncMemOp {
 
   // 16-bit Displacement
   let Supplement = (operand "$"#opnd_name, 16,
-                            (encoder "encodePCRelImm<16>"));
+                            (encoder "encodePCRelImm<16>"),
+                            (decoder "DecodeSImm<16>"));
 }
 
 class MxEncAddrMode_p<string opnd_name> : MxEncMemOp {
@@ -164,7 +166,8 @@ class MxEncAddrMode_p<string opnd_name> : MxEncMemOp {
 
   // 16-bit Displacement
   let Supplement = (operand "$"#opnd_name#".disp", 16,
-                            (encoder "encodeRelocImm<16>"));
+                            (encoder "encodeRelocImm<16>"),
+                            (decoder "DecodeSImm<16>"));
 }
 
 class MxEncAddrMode_f<string opnd_name> : MxEncMemOp {
